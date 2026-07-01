@@ -1,5 +1,11 @@
 // *************** IMPORT MODULE ***************
 const {
+    ValidateGradeLock,
+} = require(
+    './helpers/grade_lock.helper'
+);
+
+const {
     BlockModel,
     SubjectModel,
     TestModel,
@@ -38,25 +44,25 @@ function ValidateWeightageLimit(
     }
 }
 
-/**
- * Checks whether the entity is locked by
- * existing student grades.
- *
- * @param {Object} existingGrade
- *
- * @throws {AppError}
- */
-function ValidateRelationalLock(
-    existingGrade,
-) {
-    if (existingGrade) {
-        throw new AppError(
-            'Entity locked',
-            'ENTITY_LOCKED_GRADES_EXIST',
-            409,
-        );
-    }
-}
+// /**
+//  * Checks whether the entity is locked by
+//  * existing student grades.
+//  *
+//  * @param {Object} existingGrade
+//  *
+//  * @throws {AppError}
+//  */
+// function ValidateRelationalLock(
+//     existingGrade,
+// ) {
+//     if (existingGrade) {
+//         throw new AppError(
+//             'Entity locked',
+//             'ENTITY_LOCKED_GRADES_EXIST',
+//             409,
+//         );
+//     }
+// }
 
 // *************** MUTATION ***************
 async function CreateBlock(
@@ -75,11 +81,22 @@ async function UpdateBlock(
     // const existingGrade =
     //     await StudentGradeModel.findOne(...);
 
-    const existingGrade =
-        null;
+    const existingBlock =
+        await BlockModel.findById(
+            blockId
+        );
 
-    ValidateRelationalLock(
-        existingGrade
+    if (!existingBlock) {
+        throw new AppError(
+            'Block not found',
+            'BLOCK_NOT_FOUND',
+            404,
+        );
+    }
+
+    await ValidateGradeLock(
+        'BLOCK',
+        blockId,
     );
 
     return BlockModel.findByIdAndUpdate(
@@ -99,25 +116,27 @@ async function DeleteBlock(
     // const existingGrade =
     //     await StudentGradeModel.findOne(...);
 
-    const existingGrade =
-        null;
-
-    ValidateRelationalLock(
-        existingGrade
-    );
-
-    const deletedBlock =
-        await BlockModel.findByIdAndDelete(
+    const existingBlock =
+        await BlockModel.findById(
             blockId
         );
 
-    if (!deletedBlock) {
+    if (!existingBlock) {
         throw new AppError(
             'Block not found',
             'BLOCK_NOT_FOUND',
-            404
+            404,
         );
     }
+
+    await ValidateGradeLock(
+        'BLOCK',
+        blockId,
+    );
+
+    await BlockModel.findByIdAndDelete(
+        blockId
+    );
 
     return true;
 }
@@ -160,13 +179,6 @@ async function UpdateSubject(
     // const existingGrade =
     //     await StudentGradeModel.findOne(...);
 
-    const existingGrade =
-        null;
-
-    ValidateRelationalLock(
-        existingGrade
-    );
-
     const existingSubject =
         await SubjectModel.findById(
             subjectId
@@ -179,6 +191,11 @@ async function UpdateSubject(
             404,
         );
     }
+
+    await ValidateGradeLock(
+        'SUBJECT',
+        subjectId,
+    );
 
     if (
         input.weightage !==
@@ -227,16 +244,23 @@ async function DeleteSubject(
     // const existingGrade =
     //     await StudentGradeModel.findOne(...);
 
-    const existingGrade =
-        null;
-
-    ValidateRelationalLock(
-        existingGrade
+     await ValidateGradeLock(
+        'SUBJECT',
+        subjectId,
     );
 
-    await SubjectModel.findByIdAndDelete(
-        subjectId
-    );
+    const deletedSubject =
+        await SubjectModel.findByIdAndDelete(
+            subjectId
+        );
+
+    if (!deletedSubject) {
+        throw new AppError(
+            'Subject not found',
+            'SUBJECT_NOT_FOUND',
+            404,
+        );
+    }
 
     return true;
 }
@@ -279,13 +303,6 @@ async function UpdateTest(
     // const existingGrade =
     //     await StudentGradeModel.findOne(...);
 
-    const existingGrade =
-        null;
-
-    ValidateRelationalLock(
-        existingGrade
-    );
-
     const existingTest =
         await TestModel.findById(
             testId
@@ -298,6 +315,11 @@ async function UpdateTest(
             404,
         );
     }
+
+    await ValidateGradeLock(
+        'TEST',
+        testId,
+    );
 
     if (
         input.weightage !==
@@ -346,16 +368,22 @@ async function DeleteTest(
     // const existingGrade =
     //     await StudentGradeModel.findOne(...);
 
-    const existingGrade =
-        null;
-
-    ValidateRelationalLock(
-        existingGrade
+    await ValidateGradeLock(
+        'TEST',
+        testId,
     );
+    const deletedTest =
+        await TestModel.findByIdAndDelete(
+            testId
+        );
 
-    await TestModel.findByIdAndDelete(
-        testId
-    );
+    if (!deletedTest) {
+        throw new AppError(
+            'Test not found',
+            'TEST_NOT_FOUND',
+            404,
+        );
+    }
 
     return true;
 }
