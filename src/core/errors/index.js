@@ -1,4 +1,8 @@
-const AppError = require('./AppError');
+// *************** IMPORT MODULE ***************
+
+const { AppError } = require('./AppError');
+
+// *************** EXPORT MODULE ***************
 
 module.exports = {
     AppError,

@@ -1,16 +1,24 @@
+// *************** IMPORT LIBRARY ***************
 const { ApolloServer } = require('@apollo/server');
-const systemModule = require('../features/system');
 
 /**
- * Creates and configures the Apollo Server instance.
+ * Creates and configures Apollo Server.
  *
- * @returns {ApolloServer} Configured Apollo Server.
+ * @param {Object} options - Apollo configuration.
+ * @param {Array} options.typeDefs - GraphQL type definitions.
+ * @param {Object} options.resolvers - GraphQL resolvers.
+ *
+ * @returns {ApolloServer} Configured Apollo Server instance.
  */
-function createApolloServer() {
+function createApolloServer({
+    typeDefs,
+    resolvers,
+}) {
     return new ApolloServer({
-        typeDefs: systemModule.typeDefs,
-        resolvers: systemModule.resolvers,
+        typeDefs,
+        resolvers,
     });
 }
 
+// *************** EXPORT MODULE ***************
 module.exports = createApolloServer;

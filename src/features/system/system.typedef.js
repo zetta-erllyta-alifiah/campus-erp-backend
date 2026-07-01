@@ -1,7 +1,12 @@
+// *************** IMPORT LIBRARY ***************
 const { gql } = require('graphql-tag');
 
-module.exports = gql`
+// *************** GLOBAL VARIABLES ***************
+const typeDefs = gql`
     type Query {
         ping: String!
     }
 `;
+
+// *************** EXPORT MODULE ***************
+module.exports = typeDefs;

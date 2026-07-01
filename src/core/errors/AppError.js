@@ -1,15 +1,35 @@
+// *************** HELPER CLASS ***************
+
 /**
- * Custom error class for application-specific errors.
+ * Represents an application-specific error.
+ *
  * @class
  * @extends Error
- * @param {string} message - The error message.
- * @param {number} statusCode - The HTTP status code associated with the error.
-*/
+ * @param {string} message - Human readable error message.
+ * @param {string} code - Internal application error code.
+ * @param {number} [httpStatus=500] - HTTP status code.
+ * @param {Object|null} [meta=null] - Additional error metadata.
+ */
 class AppError extends Error {
-    constructor(message, statusCode) {
+    constructor(
+        message,
+        code,
+        httpStatus = 500,
+        meta = null
+    ) {
         super(message);
-        this.statusCode = statusCode;
+
+        this.name = 'AppError';
+        this.code = code;
+        this.httpStatus = httpStatus;
+        this.meta = meta;
+
+        Error.captureStackTrace(this, this.constructor);
     }
 }
 
-module.exports = { AppError };
+// *************** EXPORT MODULE ***************
+
+module.exports = {
+    AppError,
+};

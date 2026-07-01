@@ -1,3 +1,4 @@
+// *************** QUERY ***************
 /**
  * Returns the application health status.
  *
@@ -7,6 +8,7 @@ function Ping() {
     return 'pong';
 }
 
+// *************** EXPORT MODULE ***************
 module.exports = {
     Ping,
 };

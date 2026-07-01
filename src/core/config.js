@@ -2,7 +2,7 @@
 require('dotenv').config()
 
 // *************** IMPORT MODULE ***************
-const AppError = require('./errors/AppError');
+const { AppError } = require('./errors');
 
 // *************** IMPORT HELPER FUNCTION ***************
 /**
@@ -14,10 +14,19 @@ const AppError = require('./errors/AppError');
 
 function validateEnvVariables() {
     if (!process.env.MONGO_URI) {
-        throw new AppError('MONGO_URI is not defined in the environment variables.', 500);
+        throw new AppError(
+            'MONGO_URI is not defined.',
+            'CONFIG_MONGO_URI_REQUIRED',
+            500
+        );
     }
+
     if (!process.env.PORT) {
-        throw new AppError('PORT is not defined in the environment variables.', 500);
+        throw new AppError(
+            'PORT is not defined.',
+            'CONFIG_PORT_REQUIRED',
+            500
+        );
     }
 }
 
