@@ -1,45 +1,67 @@
 // *************** IMPORT LIBRARY ***************
 const express = require('express');
 const cors = require('cors');
-const { expressMiddleware } =
-    require('@as-integrations/express5');
+const {
+    expressMiddleware,
+} = require('@as-integrations/express5');
 
 // *************** IMPORT MODULE ***************
-const createApolloServer = require('./core/apollo');
-const config = require('./core/config');
-const { connectDB } = require('./core/db');
-const systemModule = require('./features/system');
+const CreateApolloServer =
+    require('./core/apollo');
+
+const applicationConfig =
+    require('./core/config');
+
+const {
+    ConnectDatabase,
+} = require('./core/db');
+
+const systemGraphQLModule =
+    require('./features/system');
+
+// *************** GLOBAL VARIABLES ***************
+const graphQLSchema = {
+    typeDefs:
+        systemGraphQLModule.typeDefs,
+    resolvers:
+        systemGraphQLModule.resolvers,
+};
 
 // *************** IMPORT HELPER FUNCTION ***************
-async function startServer() {
+async function initializeApplication() {
     try {
-        await connectDB();
+        await ConnectDatabase();
 
-        const app = express();
+        const expressApplication =
+            express();
 
-        app.use(cors());
-        app.use(express.json());
-
-        const server =
-            createApolloServer({
-                typeDefs:
-                    systemModule.typeDefs,
-                resolvers:
-                    systemModule.resolvers,
-            });
-
-        await server.start();
-
-        app.use(
-            '/graphql',
-            expressMiddleware(server)
+        expressApplication.use(
+            cors()
         );
 
-        app.listen(
-            config.port,
+        expressApplication.use(
+            express.json()
+        );
+
+        const apolloServer =
+            CreateApolloServer(
+            graphQLSchema
+        );
+
+        await apolloServer.start();
+
+        expressApplication.use(
+            '/graphql',
+            expressMiddleware(
+                apolloServer
+            )
+        );
+
+        expressApplication.listen(
+            applicationConfig.port,
             () => {
                 console.log(
-                    `Server is running on port ${config.port}`
+                    `Server is running on port ${applicationConfig.port}`
                 );
             }
         );
@@ -53,4 +75,4 @@ async function startServer() {
 }
 
 // *************** APPLICATION BOOTSTRAP ***************
-startServer();
+initializeApplication();

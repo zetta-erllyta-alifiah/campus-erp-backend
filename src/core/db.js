@@ -2,36 +2,60 @@
 const mongoose = require('mongoose');
 
 // *************** IMPORT MODULE ***************
-const config = require('./config');
+const applicationConfig = require('./config');
 const { AppError } = require('./errors');
 
 // *************** IMPORT HELPER FUNCTION ***************
-
 /**
- * Establishes a connection to the MongoDB database using Mongoose.
+ * Establishes a connection to the MongoDB database.
  *
  * @returns {Promise<void>} Resolves when the database connection is established.
- * @throws {AppError} 500 - Failed to connect to MongoDB.
+ * @throws {AppError} DATABASE_CONNECTION_FAILED - Failed to connect to MongoDB.
  */
-async function connectDB() {
+async function ConnectDatabase() {
     try {
-        await mongoose.connect(config.db.uri);
-        console.log('MongoDB connection initialized');
-    } catch (error) {
-        console.error('MongoDB connection failed:', error);
-        throw new AppError('Failed to connect to MongoDB', 500);
+        await mongoose.connect(
+            applicationConfig.db.uri
+        );
+
+        console.log(
+            'MongoDB connection initialized'
+        );
+    } catch (connectionError) {
+        console.error(
+            'MongoDB connection failed:',
+            connectionError
+        );
+
+        throw new AppError(
+            'Failed to connect to MongoDB',
+            'DATABASE_CONNECTION_FAILED',
+            500
+        );
     }
 }
 
 // *************** GLOBAL VARIABLES ***************
+mongoose.connection.on(
+    'connected',
+    () => {
+        console.log(
+            'MongoDB connected successfully'
+        );
+    }
+);
 
-mongoose.connection.on('connected', () => {
-    console.log('MongoDB connected successfully');
-});
-
-mongoose.connection.on('error', (err) => {
-    console.error('MongoDB connection error:', err);
-});
+mongoose.connection.on(
+    'error',
+    (connectionError) => {
+        console.error(
+            'MongoDB connection error:',
+            connectionError
+        );
+    }
+);
 
 // *************** EXPORT MODULE ***************
-module.exports = { connectDB };
+module.exports = {
+    ConnectDatabase,
+};

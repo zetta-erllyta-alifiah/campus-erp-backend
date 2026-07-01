@@ -1,16 +1,19 @@
 // *************** IMPORT LIBRARY ***************
-const { ApolloServer } = require('@apollo/server');
+const {
+    ApolloServer,
+} = require('@apollo/server');
 
+// *************** IMPORT HELPER FUNCTION ***************
 /**
- * Creates and configures Apollo Server.
+ * Creates and configures an Apollo Server instance.
  *
- * @param {Object} options - Apollo configuration.
- * @param {Array} options.typeDefs - GraphQL type definitions.
- * @param {Object} options.resolvers - GraphQL resolvers.
+ * @param {Object} apolloServerConfiguration - Apollo Server configuration.
+ * @param {Array} apolloServerConfiguration.typeDefs - GraphQL type definitions.
+ * @param {Object} apolloServerConfiguration.resolvers - GraphQL resolvers.
  *
  * @returns {ApolloServer} Configured Apollo Server instance.
  */
-function createApolloServer({
+function CreateApolloServer({
     typeDefs,
     resolvers,
 }) {
@@ -21,4 +24,5 @@ function createApolloServer({
 }
 
 // *************** EXPORT MODULE ***************
-module.exports = createApolloServer;
+module.exports =
+    CreateApolloServer;
