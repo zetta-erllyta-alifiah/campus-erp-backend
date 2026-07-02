@@ -45,13 +45,14 @@ async function CreateBlockMutation(
     _,
     { input },
 ) {
-    ValidateInputWithJoi(
-        CreateBlockValidator,
-        input,
-    );
+    const validatedInput =
+        ValidateInputWithJoi(
+            CreateBlockValidator,
+            input,
+        );
 
     return CreateBlock(
-        input
+        validatedInput,
     );
 }
 
@@ -69,19 +70,21 @@ async function UpdateBlockMutation(
         input,
     },
 ) {
-    ValidateInputWithJoi(
-        BlockIdValidator,
-        { block_id },
-    );
+    const validatedId =
+        ValidateInputWithJoi(
+            BlockIdValidator,
+            { block_id },
+        );
 
-    ValidateInputWithJoi(
-        UpdateBlockValidator,
-        input,
-    );
+    const validatedInput =
+        ValidateInputWithJoi(
+            UpdateBlockValidator,
+            input,
+        );
 
     return UpdateBlock(
-        block_id,
-        input,
+        validatedId.block_id,
+        validatedInput,
     );
 }
 
@@ -96,13 +99,14 @@ async function DeleteBlockMutation(
     _,
     { block_id },
 ) {
-    ValidateInputWithJoi(
-        BlockIdValidator,
-        { block_id },
-    );
+    const validatedId =
+        ValidateInputWithJoi(
+            BlockIdValidator,
+            { block_id },
+        );
 
     return DeleteBlock(
-        block_id,
+        validatedId.block_id,
     );
 }
 
@@ -117,13 +121,14 @@ async function CreateSubjectMutation(
     _,
     { input },
 ) {
-    ValidateInputWithJoi(
-        CreateSubjectValidator,
-        input,
-    );
+    const validatedInput =
+        ValidateInputWithJoi(
+            CreateSubjectValidator,
+            input,
+        );
 
     return CreateSubject(
-        input,
+        validatedInput,
     );
 }
 
@@ -141,19 +146,21 @@ async function UpdateSubjectMutation(
         input,
     },
 ) {
-    ValidateInputWithJoi(
-        SubjectIdValidator,
-        { subject_id },
-    );
+    const validatedId =
+        ValidateInputWithJoi(
+            SubjectIdValidator,
+            { subject_id },
+        );
 
-    ValidateInputWithJoi(
-        UpdateSubjectValidator,
-        input,
-    );
+    const validatedInput =
+        ValidateInputWithJoi(
+            UpdateSubjectValidator,
+            input,
+        );
 
     return UpdateSubject(
-        subject_id,
-        input,
+        validatedId.subject_id,
+        validatedInput,
     );
 }
 
@@ -168,13 +175,14 @@ async function DeleteSubjectMutation(
     _,
     { subject_id },
 ) {
-    ValidateInputWithJoi(
-        SubjectIdValidator,
-        { subject_id },
-    );
+    const validatedId =
+        ValidateInputWithJoi(
+            SubjectIdValidator,
+            { subject_id },
+        );
 
     return DeleteSubject(
-        subject_id,
+        validatedId.subject_id,
     );
 }
 
@@ -189,13 +197,14 @@ async function CreateTestMutation(
     _,
     { input },
 ) {
-    ValidateInputWithJoi(
-        CreateTestValidator,
-        input,
-    );
+    const validatedInput =
+        ValidateInputWithJoi(
+            CreateTestValidator,
+            input,
+        );
 
     return CreateTest(
-        input,
+        validatedInput,
     );
 }
 
@@ -213,19 +222,21 @@ async function UpdateTestMutation(
         input,
     },
 ) {
-    ValidateInputWithJoi(
-        TestIdValidator,
-        { test_id },
-    );
+    const validatedId =
+        ValidateInputWithJoi(
+            TestIdValidator,
+            { test_id },
+        );
 
-    ValidateInputWithJoi(
-        UpdateTestValidator,
-        input,
-    );
+    const validatedInput =
+        ValidateInputWithJoi(
+            UpdateTestValidator,
+            input,
+        );
 
     return UpdateTest(
-        test_id,
-        input,
+        validatedId.test_id,
+        validatedInput,
     );
 }
 
@@ -240,13 +251,14 @@ async function DeleteTestMutation(
     _,
     { test_id },
 ) {
-    ValidateInputWithJoi(
-        TestIdValidator,
-        { test_id },
-    );
+    const validatedId =
+        ValidateInputWithJoi(
+            TestIdValidator,
+            { test_id },
+        );
 
     return DeleteTest(
-        test_id,
+        validatedId.test_id,
     );
 }
 
