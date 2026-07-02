@@ -1,0 +1,64 @@
+// *************** IMPORT LIBRARY ***************
+const { gql } =
+    require('graphql-tag');
+
+// *************** GLOBAL VARIABLES ***************
+/**
+ * GraphQL schema definition
+ * for Student feature.
+ *
+ * Responsibilities:
+ * - Define Student object type.
+ * - Define Student input types.
+ * - Define Student mutations.
+ */
+const typeDefs = gql`
+    """
+    Student profile.
+    """
+    type Student {
+        _id: ID!
+        first_name: String!
+        last_name: String!
+        email: String!
+        student_number: String!
+        registration_date: String!
+        academic_year_ids: [ID!]!
+        createdAt: String!
+        updatedAt: String!
+    }
+
+    """
+    Input payload used to
+    create a student.
+    """
+    input CreateStudentInput {
+        first_name: String!
+        last_name: String!
+        email: String!
+        student_number: String!
+    }
+
+    type Mutation {
+        """
+        Creates a new student.
+        """
+        CreateStudent(
+            input: CreateStudentInput!
+        ): Student!
+
+        """
+        Deletes a student and
+        removes all enrollment
+        references from
+        academic years.
+        """
+        DeleteStudent(
+            student_id: ID!
+        ): Boolean!
+    }
+`;
+
+// *************** EXPORT MODULE ***************
+module.exports =
+    typeDefs;

@@ -24,24 +24,54 @@ const curriculumModule =
         './features/academic/curriculum'
     );
 
+const studentModule =
+    require(
+        './features/users/student'
+    );
+
+const enrollmentModule =
+    require(
+        './features/academic/enrollment'
+    );
+
 // *************** GLOBAL VARIABLES ***************
 const graphQLSchema = {
     typeDefs: [
         systemGraphQLModule.typeDefs,
         curriculumModule.typeDefs,
+        studentModule.typeDefs,
+        enrollmentModule.typeDefs,
     ],
 
     resolvers: [
         systemGraphQLModule.resolvers,
         curriculumModule.resolvers,
+        studentModule.resolvers,
+        enrollmentModule.resolvers,
     ],
 };
 
 // *************** IMPORT HELPER FUNCTION ***************
+/**
+ * Initializes the application
+ * runtime environment.
+ *
+ * Responsibilities:
+ * - Connect to MongoDB.
+ * - Initialize Express.
+ * - Configure middleware.
+ * - Start Apollo Server.
+ * - Expose GraphQL endpoint.
+ *
+ * @returns {Promise<void>}
+ */
 async function initializeApplication() {
     try {
+        // *************** START: Initialize database connection ***************
         await ConnectDatabase();
+        // *************** END: Initialize database connection ***************
 
+        // *************** START: Configure Express application ***************
         const expressApplication =
             express();
 
@@ -52,21 +82,27 @@ async function initializeApplication() {
         expressApplication.use(
             express.json()
         );
+        // *************** END: Configure Express application ***************
 
+        // *************** START:Configure Apollo Server ***************
         const apolloServer =
             CreateApolloServer(
-            graphQLSchema
-        );
+                graphQLSchema
+            );
 
         await apolloServer.start();
+        // *************** END: Configure Apollo Server ***************
 
+        // *************** START: Register GraphQL endpoint ***************
         expressApplication.use(
             '/graphql',
             expressMiddleware(
                 apolloServer
             )
         );
+        // *************** END: Register GraphQL endpoint ***************
 
+        // *************** START: Start HTTP server ***************
         expressApplication.listen(
             applicationConfig.port,
             () => {
@@ -75,6 +111,7 @@ async function initializeApplication() {
                 );
             }
         );
+        // *************** END: Start HTTP server ***************
     } catch (error) {
         console.error(
             `[${error.httpStatus || 500}] ${error.message}`
