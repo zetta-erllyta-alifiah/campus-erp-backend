@@ -170,24 +170,43 @@ const TestSchema =
 const StudentGradeSchema =
     new mongoose.Schema(
         {
-            // Entity category
-            entity_type: {
-                type: String,
-                enum: [
-                    'BLOCK',
-                    'SUBJECT',
-                    'TEST',
-                ],
-                required: true,
-            },
-
-            // Locked entity id
-            entity_id: {
+            student_id: {
                 type:
                     mongoose.Schema
                         .Types
                         .ObjectId,
                 required: true,
+            },
+
+            block_id: {
+                type:
+                    mongoose.Schema
+                        .Types
+                        .ObjectId,
+                ref: 'Block',
+                required: true,
+            },
+
+            subject_id: {
+                type:
+                    mongoose.Schema
+                        .Types
+                        .ObjectId,
+                ref: 'Subject',
+                required: true,
+            },
+
+            test_id: {
+                type:
+                    mongoose.Schema
+                        .Types
+                        .ObjectId,
+                ref: 'Test',
+                required: true,
+            },
+
+            score: {
+                type: Number,
             },
         },
         {

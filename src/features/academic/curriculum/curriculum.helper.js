@@ -86,14 +86,34 @@ async function ValidateGradeLock(
     entityType,
     entityId,
 ) {
+    let filter = {};
+
+    switch (entityType) {
+        case 'BLOCK':
+            filter = {
+                block_id:
+                    entityId,
+            };
+            break;
+
+        case 'SUBJECT':
+            filter = {
+                subject_id:
+                    entityId,
+            };
+            break;
+
+        case 'TEST':
+            filter = {
+                test_id:
+                    entityId,
+            };
+            break;
+    }
+
     const existingGrade =
         await StudentGradeModel.findOne(
-            {
-                entity_type:
-                    entityType,
-                entity_id:
-                    entityId,
-            },
+            filter
         );
 
     if (existingGrade) {
@@ -614,10 +634,6 @@ async function UpdateTest(
 async function DeleteTest(
     testId,
 ) {
-    // TODO:
-    // const existingGrade =
-    //     await StudentGradeModel.findOne(...);
-
     const existingTest =
         await TestModel.findById(
             testId,
@@ -639,16 +655,6 @@ async function DeleteTest(
     await TestModel.findByIdAndDelete(
         testId,
     );
-
-    return true;
-
-    if (!deletedTest) {
-        throw new AppError(
-            'Test not found',
-            'TEST_NOT_FOUND',
-            404,
-        );
-    }
 
     return true;
 }

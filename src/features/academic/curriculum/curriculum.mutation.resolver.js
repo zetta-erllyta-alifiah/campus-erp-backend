@@ -2,10 +2,16 @@
 const {
     CreateBlockValidator,
     UpdateBlockValidator,
+
     CreateSubjectValidator,
     UpdateSubjectValidator,
+
     CreateTestValidator,
     UpdateTestValidator,
+
+    BlockIdValidator,
+    SubjectIdValidator,
+    TestIdValidator,
 } = require('./curriculum.validator');
 
 const {
@@ -64,6 +70,11 @@ async function UpdateBlockMutation(
     },
 ) {
     ValidateInputWithJoi(
+        BlockIdValidator,
+        { block_id },
+    );
+
+    ValidateInputWithJoi(
         UpdateBlockValidator,
         input,
     );
@@ -85,7 +96,14 @@ async function DeleteBlockMutation(
     _,
     { block_id },
 ) {
-    return DeleteBlock(block_id);
+    ValidateInputWithJoi(
+        BlockIdValidator,
+        { block_id },
+    );
+
+    return DeleteBlock(
+        block_id,
+    );
 }
 
 /**
@@ -124,6 +142,11 @@ async function UpdateSubjectMutation(
     },
 ) {
     ValidateInputWithJoi(
+        SubjectIdValidator,
+        { subject_id },
+    );
+
+    ValidateInputWithJoi(
         UpdateSubjectValidator,
         input,
     );
@@ -145,8 +168,13 @@ async function DeleteSubjectMutation(
     _,
     { subject_id },
 ) {
+    ValidateInputWithJoi(
+        SubjectIdValidator,
+        { subject_id },
+    );
+
     return DeleteSubject(
-        subject_id
+        subject_id,
     );
 }
 
@@ -186,6 +214,11 @@ async function UpdateTestMutation(
     },
 ) {
     ValidateInputWithJoi(
+        TestIdValidator,
+        { test_id },
+    );
+
+    ValidateInputWithJoi(
         UpdateTestValidator,
         input,
     );
@@ -207,8 +240,13 @@ async function DeleteTestMutation(
     _,
     { test_id },
 ) {
+    ValidateInputWithJoi(
+        TestIdValidator,
+        { test_id },
+    );
+
     return DeleteTest(
-        test_id
+        test_id,
     );
 }
 

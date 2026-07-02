@@ -208,6 +208,36 @@ const UpdateTestValidator = Joi.object({
         ),
 }).min(1);
 
+/**
+ * Validates block identifier.
+ */
+const BlockIdValidator =
+    Joi.object({
+        block_id:
+            objectIdValidator
+                .required(),
+    });
+
+/**
+ * Validates subject identifier.
+ */
+const SubjectIdValidator =
+    Joi.object({
+        subject_id:
+            objectIdValidator
+                .required(),
+    });
+
+/**
+ * Validates test identifier.
+ */
+const TestIdValidator =
+    Joi.object({
+        test_id:
+            objectIdValidator
+                .required(),
+    });
+
 // *************** EXPORT MODULE ***************
 module.exports = {
     CreateBlockValidator,
@@ -218,4 +248,8 @@ module.exports = {
 
     CreateTestValidator,
     UpdateTestValidator,
+
+    BlockIdValidator,
+    SubjectIdValidator,
+    TestIdValidator,
 };
