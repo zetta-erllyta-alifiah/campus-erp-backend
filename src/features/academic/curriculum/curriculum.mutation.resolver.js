@@ -9,6 +9,12 @@ const {
 } = require('./curriculum.validator');
 
 const {
+    ValidateInputWithJoi,
+} = require(
+    '../../../core/validator'
+);
+
+const {
     CreateBlock,
     UpdateBlock,
     DeleteBlock,
@@ -33,11 +39,14 @@ async function CreateBlockMutation(
     _,
     { input },
 ) {
-    await CreateBlockValidator.validateAsync(
-        input
+    ValidateInputWithJoi(
+        CreateBlockValidator,
+        input,
     );
 
-    return CreateBlock(input);
+    return CreateBlock(
+        input
+    );
 }
 
 /**
@@ -54,13 +63,14 @@ async function UpdateBlockMutation(
         input,
     },
 ) {
-    await UpdateBlockValidator.validateAsync(
-        input
+    ValidateInputWithJoi(
+        UpdateBlockValidator,
+        input,
     );
 
     return UpdateBlock(
         block_id,
-        input
+        input,
     );
 }
 
@@ -89,11 +99,14 @@ async function CreateSubjectMutation(
     _,
     { input },
 ) {
-    await CreateSubjectValidator.validateAsync(
-        input
+    ValidateInputWithJoi(
+        CreateSubjectValidator,
+        input,
     );
 
-    return CreateSubject(input);
+    return CreateSubject(
+        input,
+    );
 }
 
 /**
@@ -110,13 +123,14 @@ async function UpdateSubjectMutation(
         input,
     },
 ) {
-    await UpdateSubjectValidator.validateAsync(
-        input
+    ValidateInputWithJoi(
+        UpdateSubjectValidator,
+        input,
     );
 
     return UpdateSubject(
         subject_id,
-        input
+        input,
     );
 }
 
@@ -147,11 +161,14 @@ async function CreateTestMutation(
     _,
     { input },
 ) {
-    await CreateTestValidator.validateAsync(
-        input
+    ValidateInputWithJoi(
+        CreateTestValidator,
+        input,
     );
 
-    return CreateTest(input);
+    return CreateTest(
+        input,
+    );
 }
 
 /**
@@ -168,13 +185,14 @@ async function UpdateTestMutation(
         input,
     },
 ) {
-    await UpdateTestValidator.validateAsync(
-        input
+    ValidateInputWithJoi(
+        UpdateTestValidator,
+        input,
     );
 
     return UpdateTest(
         test_id,
-        input
+        input,
     );
 }
 
