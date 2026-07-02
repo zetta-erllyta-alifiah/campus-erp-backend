@@ -1,14 +1,28 @@
 // *************** IMPORT LIBRARY ***************
 const { gql } = require('graphql-tag');
 
-// *************** GLOBAL VARIABLES ***************
+/**
+ * Curriculum GraphQL schema definitions.
+ *
+ * This file defines:
+ * - GraphQL object types
+ * - GraphQL input types
+ * - Curriculum mutations
+ *
+ * Naming conventions:
+ * - Mutation names use PascalCase
+ * - Field names use snake_case
+ */
+
 const typeDefs = gql`
+    # Shared grading rule object    
     type GradingRule {
         label: String!
         operator: String!
         threshold: Float!
     }
 
+    # Academic block entity
     type Block {
         _id: ID!
         name: String!
@@ -18,6 +32,7 @@ const typeDefs = gql`
         updatedAt: String!
     }
 
+    # Subject entity that belongs to a block
     type Subject {
         _id: ID!
         name: String!
@@ -28,6 +43,7 @@ const typeDefs = gql`
         updatedAt: String!
     }
 
+    # Test entity that belongs to a subject
     type Test {
         _id: ID!
         name: String!

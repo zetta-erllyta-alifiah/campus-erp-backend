@@ -6,9 +6,11 @@ const {
     CreateBlockMutation,
     UpdateBlockMutation,
     DeleteBlockMutation,
+
     CreateSubjectMutation,
     UpdateSubjectMutation,
     DeleteSubjectMutation,
+
     CreateTestMutation,
     UpdateTestMutation,
     DeleteTestMutation,
@@ -17,8 +19,21 @@ const {
 );
 
 // *************** GLOBAL VARIABLES ***************
+/**
+ * Curriculum GraphQL resolvers.
+ *
+ * Contains all mutation resolvers
+ * related to academic curriculum
+ * management, including:
+ * - Block management
+ * - Subject management
+ * - Test management
+ *
+ * @type {Object}
+ */
 const resolvers = {
     Mutation: {
+        // Block mutations
         CreateBlock:
             CreateBlockMutation,
 
@@ -28,6 +43,7 @@ const resolvers = {
         DeleteBlock:
             DeleteBlockMutation,
 
+        // Subject mutations
         CreateSubject:
             CreateSubjectMutation,
 
@@ -37,6 +53,7 @@ const resolvers = {
         DeleteSubject:
             DeleteSubjectMutation,
 
+        // Test mutations
         CreateTest:
             CreateTestMutation,
 

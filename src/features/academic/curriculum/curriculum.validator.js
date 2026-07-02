@@ -1,7 +1,56 @@
 // *************** IMPORT LIBRARY ***************
 const Joi = require('joi');
+const mongoose = require('mongoose');
 
-// *************** GLOBAL VARIABLES ***************
+/**
+ * Curriculum validation schemas.
+ *
+ * This file contains validation rules for:
+ * - Block
+ * - Subject
+ * - Test
+ *
+ * Validation responsibilities:
+ * - Input shape validation
+ * - ObjectId validation
+ * - Weightage validation
+ * - Grading rule validation
+ */
+
+/// *************** SHARED VALIDATORS ***************
+/**
+ * Validates MongoDB ObjectId.
+ *
+ * @type {Joi.StringSchema}
+ */
+const objectIdValidator =
+    Joi.string().custom(
+        (value, helpers) => {
+            if (
+                !mongoose.Types.ObjectId.isValid(
+                    value
+                )
+            ) {
+                return helpers.error(
+                    'any.invalid'
+                );
+            }
+
+            return value;
+        },
+        'ObjectId validation'
+    );
+
+/**
+* Validates grading rule objects.
+*
+* Supported operators:
+* - >
+* - >=
+* - <
+* - <=
+* - ==
+*/
 const gradingRuleValidator = Joi.object({
     label: Joi.string()
         .trim()
@@ -21,6 +70,10 @@ const gradingRuleValidator = Joi.object({
         .required(),
 });
 
+// *************** BLOCK VALIDATORS ***************
+/**
+ * Validates block creation payload.
+ */
 const CreateBlockValidator = Joi.object({
     name: Joi.string()
         .trim()
@@ -37,6 +90,12 @@ const CreateBlockValidator = Joi.object({
         .default([]),
 });
 
+/**
+ * Validates block update payload.
+ *
+ * At least one field
+ * must be provided.
+ */
 const UpdateBlockValidator = Joi.object({
     name: Joi.string()
         .trim(),
@@ -50,13 +109,23 @@ const UpdateBlockValidator = Joi.object({
         ),
 }).min(1);
 
+// *************** SUBJECT VALIDATORS ***************
+/**
+ * Validates subject creation payload.
+ *
+ * Business rules:
+ * - block_id must be a valid ObjectId.
+ * - weightage must be between
+ *   0 and 100.
+ */
 const CreateSubjectValidator = Joi.object({
     name: Joi.string()
         .trim()
         .required(),
 
-    block_id: Joi.string()
-        .required(),
+    block_id:
+        objectIdValidator
+            .required(),
 
     weightage: Joi.number()
         .positive()
@@ -70,6 +139,12 @@ const CreateSubjectValidator = Joi.object({
         .default([]),
 });
 
+/**
+ * Validates subject update payload.
+ *
+ * At least one field
+ * must be provided.
+ */
 const UpdateSubjectValidator = Joi.object({
     name: Joi.string()
         .trim(),
@@ -84,13 +159,22 @@ const UpdateSubjectValidator = Joi.object({
         ),
 }).min(1);
 
+/**
+ * Validates test creation payload.
+ *
+ * Business rules:
+ * - subject_id must be a valid ObjectId.
+ * - weightage must be between
+ *   0 and 100.
+ */
 const CreateTestValidator = Joi.object({
     name: Joi.string()
         .trim()
         .required(),
 
-    subject_id: Joi.string()
-        .required(),
+    subject_id:
+        objectIdValidator
+            .required(),
 
     weightage: Joi.number()
         .positive()
@@ -104,6 +188,12 @@ const CreateTestValidator = Joi.object({
         .default([]),
 });
 
+/**
+ * Validates test update payload.
+ *
+ * At least one field
+ * must be provided.
+ */
 const UpdateTestValidator = Joi.object({
     name: Joi.string()
         .trim(),
