@@ -19,12 +19,22 @@ const {
 const systemGraphQLModule =
     require('./features/system');
 
+const curriculumModule =
+    require(
+        './features/academic/curriculum'
+    );
+
 // *************** GLOBAL VARIABLES ***************
 const graphQLSchema = {
-    typeDefs:
+    typeDefs: [
         systemGraphQLModule.typeDefs,
-    resolvers:
+        curriculumModule.typeDefs,
+    ],
+
+    resolvers: [
         systemGraphQLModule.resolvers,
+        curriculumModule.resolvers,
+    ],
 };
 
 // *************** IMPORT HELPER FUNCTION ***************

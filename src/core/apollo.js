@@ -3,23 +3,54 @@ const {
     ApolloServer,
 } = require('@apollo/server');
 
-// *************** IMPORT HELPER FUNCTION ***************
+// *************** IMPORT MODULE ***************
+const {
+    AppError,
+} = require('./errors');
+
 /**
- * Creates and configures an Apollo Server instance.
+ * Creates and configures Apollo Server.
  *
- * @param {Object} apolloServerConfiguration - Apollo Server configuration.
- * @param {Array} apolloServerConfiguration.typeDefs - GraphQL type definitions.
- * @param {Object} apolloServerConfiguration.resolvers - GraphQL resolvers.
+ * @param {Object} options
  *
- * @returns {ApolloServer} Configured Apollo Server instance.
+ * @returns {ApolloServer}
  */
-function CreateApolloServer({
-    typeDefs,
-    resolvers,
-}) {
+function CreateApolloServer(
+    options,
+) {
     return new ApolloServer({
-        typeDefs,
-        resolvers,
+        typeDefs:
+            options.typeDefs,
+
+        resolvers:
+            options.resolvers,
+
+        formatError(
+            formattedError,
+            error,
+        ) {
+            const originalError =
+                error.originalError;
+
+            if (
+                originalError instanceof AppError
+            ) {
+                return {
+                    message:
+                        originalError.message,
+                    extensions: {
+                        code:
+                            originalError.code,
+                        httpStatus:
+                            originalError.httpStatus,
+                        meta:
+                            originalError.meta,
+                    },
+                };
+            }
+
+            return formattedError;
+        },
     });
 }
 
