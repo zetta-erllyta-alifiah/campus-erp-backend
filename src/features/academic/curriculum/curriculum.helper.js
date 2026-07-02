@@ -21,7 +21,7 @@ const {
     TestModel,
     StudentGradeModel,
 } = require(
-    './curriculum.models'
+    './curriculum.model'
 );
 
 const { AppError } =
