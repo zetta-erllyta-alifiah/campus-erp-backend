@@ -67,20 +67,25 @@ async function EnrollStudentsHelper(
 
     // *************** START: Remove duplicates ***************
     const uniqueStudentIds =
-        [...new Set(
-            input.student_ids.map(
-                String
+        [
+            ...new Set(
+                input.student_ids.map(
+                    String,
+                ),
             ),
-        )];
+        ];
     // *************** END: Remove duplicates ***************
 
     // *************** START: Validate student references ***************
     const studentCount =
-        await StudentModel.countDocuments({
-            _id: {
-                $in: uniqueStudentIds,
+        await StudentModel.countDocuments(
+            {
+                _id: {
+                    $in:
+                        uniqueStudentIds,
+                },
             },
-        });
+        );
 
     if (
         studentCount !==
@@ -93,35 +98,6 @@ async function EnrollStudentsHelper(
         );
     }
     // *************** END: Validate student references ***************
-
-    // *************** START: Validate existing enrollment ***************
-    const enrolledStudentIds =
-        academicYear.student_ids.map(
-            String,
-        );
-
-    const alreadyEnrolledStudents =
-        uniqueStudentIds.filter(
-            (studentId) =>
-                enrolledStudentIds.includes(
-                    studentId,
-                ),
-        );
-
-    if (
-        alreadyEnrolledStudents.length > 0
-    ) {
-        throw new AppError(
-            'Student already enrolled in academic year',
-            'STUDENT_ALREADY_ENROLLED',
-            409,
-            {
-                student_ids:
-                    alreadyEnrolledStudents,
-            },
-        );
-    }
-    // *************** END: Validate existing enrollment ***************
 
     // *************** START: Update academic year ***************
     const updatedYear =
