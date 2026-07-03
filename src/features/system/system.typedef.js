@@ -3,9 +3,9 @@ const { gql } = require('graphql-tag');
 
 // *************** GLOBAL VARIABLES ***************
 const typeDefs = gql`
-    type Query {
-        ping: String!
-    }
+  type Query {
+    ping: String!
+  }
 `;
 
 // *************** EXPORT MODULE ***************

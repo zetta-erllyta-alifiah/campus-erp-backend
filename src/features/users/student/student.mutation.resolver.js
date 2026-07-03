@@ -1,27 +1,11 @@
 // *************** IMPORT MODULE ***************
-const {
-    CreateStudentHelper,
-} = require(
-    './student.helper'
-);
+const { CreateStudentHelper } = require('./student.helper');
 
-const {
-    CreateStudentValidator,
-} = require(
-    './student.validator'
-);
+const { CreateStudentValidator } = require('./student.validator');
 
-const {
-    ValidateInputWithJoi,
-} = require(
-    '../../../shared/validators/validator'
-);
+const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
 
-const {
-    NormalizeGqlError,
-} = require(
-    '../../../core/errors'
-);
+const { NormalizeGqlError } = require('../../../core/errors');
 
 // *************** MUTATION ***************
 
@@ -40,37 +24,25 @@ const {
  *
  * @returns {Promise<Object>}
  */
-async function CreateStudentMutation(
-    _,
-    args,
-) {
-    try {
-        // *************** START: Extract payload ***************
-        const { input } =
-            args;
-        // *************** END: Extract payload ***************
+async function CreateStudentMutation(_, args) {
+  try {
+    // *************** START: Extract payload ***************
+    const { input } = args;
+    // *************** END: Extract payload ***************
 
-        // *************** START: Validate and sanitize payload ***************
-        const validatedInput =
-            ValidateInputWithJoi(
-                CreateStudentValidator,
-                input,
-            );
-        // *************** END: Validate and sanitize payload ***************
+    // *************** START: Validate and sanitize payload ***************
+    const validatedInput = ValidateInputWithJoi(CreateStudentValidator, input);
+    // *************** END: Validate and sanitize payload ***************
 
-        // *************** START: Execute business logic ***************
-        return await CreateStudentHelper(
-            validatedInput,
-        );
-        // *************** END: Execute business logic ***************
-    } catch (error) {
-        throw NormalizeGqlError(
-            error,
-        );
-    }
+    // *************** START: Execute business logic ***************
+    return await CreateStudentHelper(validatedInput);
+    // *************** END: Execute business logic ***************
+  } catch (error) {
+    throw NormalizeGqlError(error);
+  }
 }
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    CreateStudentMutation,
+  CreateStudentMutation,
 };

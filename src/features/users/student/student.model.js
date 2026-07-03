@@ -1,6 +1,5 @@
 // *************** IMPORT LIBRARY ***************
-const mongoose =
-    require('mongoose');
+const mongoose = require('mongoose');
 
 // *************** GLOBAL VARIABLES ***************
 
@@ -12,77 +11,67 @@ const mongoose =
  * - Maintain bidirectional relationship
  *   with AcademicYear.
  */
-const StudentSchema =
-    new mongoose.Schema(
+const StudentSchema = new mongoose.Schema(
+  {
+    // Student first name.
+    first_name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    // Student last name.
+    last_name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    // Unique student email used for authentication and contact.
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+
+    // Unique student identifier used by the institution.
+    // Example: ZB-2026-001
+    student_number: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+
+    // Date when the student was registered in the system.
+    registration_date: {
+      type: Date,
+      default: Date.now,
+    },
+
+    // References to academic years in which the student is enrolled.
+    academic_year_ids: {
+      type: [
         {
-            // Student first name.
-            first_name: {
-                type: String,
-                required: true,
-                trim: true,
-            },
-
-            // Student last name.
-            last_name: {
-                type: String,
-                required: true,
-                trim: true,
-            },
-
-            // Unique student email used for authentication and contact.
-            email: {
-                type: String,
-                required: true,
-                unique: true,
-                trim: true,
-                lowercase: true,
-            },
-
-            // Unique student identifier used by the institution.
-            // Example: ZB-2026-001
-            student_number: {
-                type: String,
-                required: true,
-                unique: true,
-                trim: true,
-            },
-
-            // Date when the student was registered in the system.
-            registration_date: {
-                type: Date,
-                default: Date.now,
-            },
-
-            // References to academic years in which the student is enrolled.
-            academic_year_ids: {
-                type: [
-                    {
-                        type:
-                            mongoose
-                                .Schema
-                                .Types
-                                .ObjectId,
-                        ref:
-                            'AcademicYear',
-                    },
-                ],
-                default: [],
-            },
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'AcademicYear',
         },
-        {
-            timestamps: true,
-        },
-    );
+      ],
+      default: [],
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
 
 // *************** GLOBAL VARIABLES ***************
 
-const StudentModel =
-    mongoose.model(
-        'Student',
-        StudentSchema,
-    );
+const StudentModel = mongoose.model('Student', StudentSchema);
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    StudentModel,
+  StudentModel,
 };

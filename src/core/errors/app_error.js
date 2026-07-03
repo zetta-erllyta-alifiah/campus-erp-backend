@@ -11,25 +11,20 @@
  * @param {Object|null} [meta=null] - Additional error metadata.
  */
 class AppError extends Error {
-    constructor(
-        message,
-        code,
-        httpStatus = 500,
-        meta = null
-    ) {
-        super(message);
+  constructor(message, code, httpStatus = 500, meta = null) {
+    super(message);
 
-        this.name = 'AppError';
-        this.code = code;
-        this.httpStatus = httpStatus;
-        this.meta = meta;
+    this.name = 'AppError';
+    this.code = code;
+    this.httpStatus = httpStatus;
+    this.meta = meta;
 
-        Error.captureStackTrace(this, this.constructor);
-    }
+    Error.captureStackTrace(this, this.constructor);
+  }
 }
 
 // *************** EXPORT MODULE ***************
 
 module.exports = {
-    AppError,
+  AppError,
 };

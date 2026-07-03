@@ -1,6 +1,5 @@
 // *************** IMPORT MODULE ***************
-const { AppError } =
-    require('../../core/errors');
+const { AppError } = require('../../core/errors');
 
 /**
  * Validates payload using
@@ -18,38 +17,20 @@ const { AppError } =
  *
  * @throws {AppError}
  */
-function ValidateInputWithJoi(
-    schema,
-    payload,
-) {
-    const {
-        error,
-        value,
-    } = schema.validate(
-        payload,
-        {
-            abortEarly: false,
-            stripUnknown: true,
-        },
-    );
+function ValidateInputWithJoi(schema, payload) {
+  const { error, value } = schema.validate(payload, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
 
-    if (error) {
-        throw new AppError(
-            error.details
-                .map(
-                    detail =>
-                        detail.message
-                )
-                .join(', '),
-            'VALIDATION_ERROR',
-            400,
-        );
-    }
+  if (error) {
+    throw new AppError(error.details.map((detail) => detail.message).join(', '), 'VALIDATION_ERROR', 400);
+  }
 
-    return value;
+  return value;
 }
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    ValidateInputWithJoi,
+  ValidateInputWithJoi,
 };

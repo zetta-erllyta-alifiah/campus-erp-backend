@@ -5,10 +5,10 @@
  * @returns {string} The application health status.
  */
 function Ping() {
-    return 'pong';
+  return 'pong';
 }
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    Ping,
+  Ping,
 };

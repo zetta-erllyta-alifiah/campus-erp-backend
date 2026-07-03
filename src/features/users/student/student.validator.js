@@ -23,30 +23,15 @@ const Joi = require('joi');
  * - Email must be valid.
  * - Student number is required.
  */
-const CreateStudentValidator =
-    Joi.object({
-        first_name:
-            Joi.string()
-                .trim()
-                .required(),
+const CreateStudentValidator = Joi.object({
+  first_name: Joi.string().trim().required(),
 
-        last_name:
-            Joi.string()
-                .trim()
-                .required(),
+  last_name: Joi.string().trim().required(),
 
-        email:
-            Joi.string()
-                .email()
-                .trim()
-                .lowercase()
-                .required(),
+  email: Joi.string().email().trim().lowercase().required(),
 
-        student_number:
-            Joi.string()
-                .trim()
-                .required(),
-    });
+  student_number: Joi.string().trim().required(),
+});
 
 /**
  * Validation schema for
@@ -57,29 +42,18 @@ const CreateStudentValidator =
  *   must be provided.
  * - Email must remain valid.
  */
-const UpdateStudentValidator =
-    Joi.object({
-        first_name:
-            Joi.string()
-                .trim(),
+const UpdateStudentValidator = Joi.object({
+  first_name: Joi.string().trim(),
 
-        last_name:
-            Joi.string()
-                .trim(),
+  last_name: Joi.string().trim(),
 
-        email:
-            Joi.string()
-                .email()
-                .trim()
-                .lowercase(),
+  email: Joi.string().email().trim().lowercase(),
 
-        student_number:
-            Joi.string()
-                .trim(),
-    }).min(1);
+  student_number: Joi.string().trim(),
+}).min(1);
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    CreateStudentValidator,
-    UpdateStudentValidator,
+  CreateStudentValidator,
+  UpdateStudentValidator,
 };

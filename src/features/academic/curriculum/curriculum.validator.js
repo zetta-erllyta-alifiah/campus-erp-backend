@@ -23,51 +23,30 @@ const mongoose = require('mongoose');
  *
  * @type {Joi.StringSchema}
  */
-const objectIdValidator =
-    Joi.string().custom(
-        (value, helpers) => {
-            if (
-                !mongoose.Types.ObjectId.isValid(
-                    value
-                )
-            ) {
-                return helpers.error(
-                    'any.invalid'
-                );
-            }
+const objectIdValidator = Joi.string().custom((value, helpers) => {
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    return helpers.error('any.invalid');
+  }
 
-            return value;
-        },
-        'ObjectId validation'
-    );
+  return value;
+}, 'ObjectId validation');
 
 /**
-* Validates grading rule objects.
-*
-* Supported operators:
-* - >
-* - >=
-* - <
-* - <=
-* - ==
-*/
+ * Validates grading rule objects.
+ *
+ * Supported operators:
+ * - >
+ * - >=
+ * - <
+ * - <=
+ * - ==
+ */
 const gradingRuleValidator = Joi.object({
-    label: Joi.string()
-        .trim()
-        .required(),
+  label: Joi.string().trim().required(),
 
-    operator: Joi.string()
-        .valid(
-            '>',
-            '>=',
-            '<',
-            '<=',
-            '=='
-        )
-        .required(),
+  operator: Joi.string().valid('>', '>=', '<', '<=', '==').required(),
 
-    threshold: Joi.number()
-        .required(),
+  threshold: Joi.number().required(),
 });
 
 // *************** BLOCK VALIDATORS ***************
@@ -75,19 +54,11 @@ const gradingRuleValidator = Joi.object({
  * Validates block creation payload.
  */
 const CreateBlockValidator = Joi.object({
-    name: Joi.string()
-        .trim()
-        .required(),
+  name: Joi.string().trim().required(),
 
-    academic_year: Joi.string()
-        .trim()
-        .required(),
+  academic_year: Joi.string().trim().required(),
 
-    grading_rules: Joi.array()
-        .items(
-            gradingRuleValidator
-        )
-        .default([]),
+  grading_rules: Joi.array().items(gradingRuleValidator).default([]),
 });
 
 /**
@@ -97,16 +68,11 @@ const CreateBlockValidator = Joi.object({
  * must be provided.
  */
 const UpdateBlockValidator = Joi.object({
-    name: Joi.string()
-        .trim(),
+  name: Joi.string().trim(),
 
-    academic_year: Joi.string()
-        .trim(),
+  academic_year: Joi.string().trim(),
 
-    grading_rules: Joi.array()
-        .items(
-            gradingRuleValidator
-        ),
+  grading_rules: Joi.array().items(gradingRuleValidator),
 }).min(1);
 
 // *************** SUBJECT VALIDATORS ***************
@@ -119,24 +85,13 @@ const UpdateBlockValidator = Joi.object({
  *   0 and 100.
  */
 const CreateSubjectValidator = Joi.object({
-    name: Joi.string()
-        .trim()
-        .required(),
+  name: Joi.string().trim().required(),
 
-    block_id:
-        objectIdValidator
-            .required(),
+  block_id: objectIdValidator.required(),
 
-    weightage: Joi.number()
-        .positive()
-        .max(100)
-        .required(),
+  weightage: Joi.number().positive().max(100).required(),
 
-    grading_rules: Joi.array()
-        .items(
-            gradingRuleValidator
-        )
-        .default([]),
+  grading_rules: Joi.array().items(gradingRuleValidator).default([]),
 });
 
 /**
@@ -146,17 +101,11 @@ const CreateSubjectValidator = Joi.object({
  * must be provided.
  */
 const UpdateSubjectValidator = Joi.object({
-    name: Joi.string()
-        .trim(),
+  name: Joi.string().trim(),
 
-    weightage: Joi.number()
-        .positive()
-        .max(100),
+  weightage: Joi.number().positive().max(100),
 
-    grading_rules: Joi.array()
-        .items(
-            gradingRuleValidator
-        ),
+  grading_rules: Joi.array().items(gradingRuleValidator),
 }).min(1);
 
 /**
@@ -168,24 +117,13 @@ const UpdateSubjectValidator = Joi.object({
  *   0 and 100.
  */
 const CreateTestValidator = Joi.object({
-    name: Joi.string()
-        .trim()
-        .required(),
+  name: Joi.string().trim().required(),
 
-    subject_id:
-        objectIdValidator
-            .required(),
+  subject_id: objectIdValidator.required(),
 
-    weightage: Joi.number()
-        .positive()
-        .max(100)
-        .required(),
+  weightage: Joi.number().positive().max(100).required(),
 
-    grading_rules: Joi.array()
-        .items(
-            gradingRuleValidator
-        )
-        .default([]),
+  grading_rules: Joi.array().items(gradingRuleValidator).default([]),
 });
 
 /**
@@ -195,61 +133,46 @@ const CreateTestValidator = Joi.object({
  * must be provided.
  */
 const UpdateTestValidator = Joi.object({
-    name: Joi.string()
-        .trim(),
+  name: Joi.string().trim(),
 
-    weightage: Joi.number()
-        .positive()
-        .max(100),
+  weightage: Joi.number().positive().max(100),
 
-    grading_rules: Joi.array()
-        .items(
-            gradingRuleValidator
-        ),
+  grading_rules: Joi.array().items(gradingRuleValidator),
 }).min(1);
 
 /**
  * Validates block identifier.
  */
-const BlockIdValidator =
-    Joi.object({
-        block_id:
-            objectIdValidator
-                .required(),
-    });
+const BlockIdValidator = Joi.object({
+  block_id: objectIdValidator.required(),
+});
 
 /**
  * Validates subject identifier.
  */
-const SubjectIdValidator =
-    Joi.object({
-        subject_id:
-            objectIdValidator
-                .required(),
-    });
+const SubjectIdValidator = Joi.object({
+  subject_id: objectIdValidator.required(),
+});
 
 /**
  * Validates test identifier.
  */
-const TestIdValidator =
-    Joi.object({
-        test_id:
-            objectIdValidator
-                .required(),
-    });
+const TestIdValidator = Joi.object({
+  test_id: objectIdValidator.required(),
+});
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    CreateBlockValidator,
-    UpdateBlockValidator,
+  CreateBlockValidator,
+  UpdateBlockValidator,
 
-    CreateSubjectValidator,
-    UpdateSubjectValidator,
+  CreateSubjectValidator,
+  UpdateSubjectValidator,
 
-    CreateTestValidator,
-    UpdateTestValidator,
+  CreateTestValidator,
+  UpdateTestValidator,
 
-    BlockIdValidator,
-    SubjectIdValidator,
-    TestIdValidator,
+  BlockIdValidator,
+  SubjectIdValidator,
+  TestIdValidator,
 };

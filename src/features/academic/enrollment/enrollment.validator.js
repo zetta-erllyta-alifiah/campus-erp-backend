@@ -8,27 +8,13 @@ const mongoose = require('mongoose');
  * Custom validator for MongoDB
  * ObjectId values.
  */
-const objectIdValidator =
-    Joi.string().custom(
-        (
-            value,
-            helpers,
-        ) => {
-            if (
-                !mongoose
-                    .Types
-                    .ObjectId
-                    .isValid(value)
-            ) {
-                return helpers.error(
-                    'any.invalid'
-                );
-            }
+const objectIdValidator = Joi.string().custom((value, helpers) => {
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    return helpers.error('any.invalid');
+  }
 
-            return value;
-        },
-        'ObjectId validation',
-    );
+  return value;
+}, 'ObjectId validation');
 
 /**
  * Validation schema for creating
@@ -41,20 +27,11 @@ const objectIdValidator =
  *   at least one valid
  *   MongoDB ObjectId.
  */
-const CreateEnrollmentValidator =
-    Joi.object({
-        academic_year_id:
-            objectIdValidator
-                .required(),
+const CreateEnrollmentValidator = Joi.object({
+  academic_year_id: objectIdValidator.required(),
 
-        student_ids:
-            Joi.array()
-                .items(
-                    objectIdValidator
-                )
-                .min(1)
-                .required(),
-    });
+  student_ids: Joi.array().items(objectIdValidator).min(1).required(),
+});
 
 /**
  * Validation schema for updating
@@ -65,18 +42,12 @@ const CreateEnrollmentValidator =
  *   at least one valid
  *   MongoDB ObjectId.
  */
-const UpdateEnrollmentValidator =
-    Joi.object({
-        student_ids:
-            Joi.array()
-                .items(
-                    objectIdValidator
-                )
-                .min(1),
-    }).min(1);
+const UpdateEnrollmentValidator = Joi.object({
+  student_ids: Joi.array().items(objectIdValidator).min(1),
+}).min(1);
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    CreateEnrollmentValidator,
-    UpdateEnrollmentValidator,
+  CreateEnrollmentValidator,
+  UpdateEnrollmentValidator,
 };

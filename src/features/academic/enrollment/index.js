@@ -1,14 +1,7 @@
 // *************** IMPORT MODULE ***************
-const typeDefs =
-    require(
-        './enrollment.typedef'
-    );
+const typeDefs = require('./enrollment.typedef');
 
-const {
-    EnrollStudentsToYearMutation,
-} = require(
-    './enrollment.mutation.resolver'
-);
+const { EnrollStudentsToYearMutation } = require('./enrollment.mutation.resolver');
 
 // *************** GLOBAL VARIABLES ***************
 
@@ -24,14 +17,13 @@ const {
  * inside helper functions.
  */
 const resolvers = {
-    Mutation: {
-        EnrollStudentsToYear:
-            EnrollStudentsToYearMutation,
-    },
+  Mutation: {
+    EnrollStudentsToYear: EnrollStudentsToYearMutation,
+  },
 };
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    typeDefs,
-    resolvers,
+  typeDefs,
+  resolvers,
 };

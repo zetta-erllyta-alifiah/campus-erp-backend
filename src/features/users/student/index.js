@@ -1,12 +1,7 @@
 // *************** IMPORT MODULE ***************
-const typeDefs =
-    require('./student.typedef');
+const typeDefs = require('./student.typedef');
 
-const {
-    CreateStudentMutation,
-} = require(
-    './student.mutation.resolver'
-);
+const { CreateStudentMutation } = require('./student.mutation.resolver');
 
 // *************** GLOBAL VARIABLES ***************
 
@@ -22,14 +17,13 @@ const {
  * inside helper functions.
  */
 const resolvers = {
-    Mutation: {
-        CreateStudent:
-            CreateStudentMutation,
-    },
+  Mutation: {
+    CreateStudent: CreateStudentMutation,
+  },
 };
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    typeDefs,
-    resolvers,
+  typeDefs,
+  resolvers,
 };
