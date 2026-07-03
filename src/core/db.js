@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 // *************** IMPORT MODULE ***************
 const applicationConfig = require('./config');
-const { AppError } = require('./errors');
+const { AppError } = require('./errors/');
 
 // *************** IMPORT HELPER FUNCTION ***************
 /**

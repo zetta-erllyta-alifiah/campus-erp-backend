@@ -6,7 +6,7 @@ const {
 // *************** IMPORT MODULE ***************
 const {
     AppError
-} = require('./AppError');
+} = require('./app_error');
 
 /**
  * Converts internal errors

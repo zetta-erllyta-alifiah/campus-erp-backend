@@ -46,7 +46,6 @@ const typeDefs = gql`
         CreateStudent(
             input: CreateStudentInput!
         ): Student!
-
     }
 `;
 

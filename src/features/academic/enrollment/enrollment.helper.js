@@ -14,7 +14,7 @@ const {
 const {
     AppError,
 } = require(
-    '../../../core/errors'
+    '../../../core/errors/app_error'
 );
 
 // *************** MUTATION ***************

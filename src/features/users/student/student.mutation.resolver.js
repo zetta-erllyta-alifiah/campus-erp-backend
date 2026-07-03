@@ -1,7 +1,6 @@
 // *************** IMPORT MODULE ***************
 const {
     CreateStudentHelper,
-    DeleteStudentHelper,
 } = require(
     './student.helper'
 );
@@ -51,16 +50,17 @@ async function CreateStudentMutation(
             args;
         // *************** END: Extract payload ***************
 
-        // *************** START: Validate payload***************
-        ValidateInputWithJoi(
-            CreateStudentValidator,
-            input,
-        );
-        // *************** END: Validate payload ***************
+        // *************** START: Validate and sanitize payload ***************
+        const validatedInput =
+            ValidateInputWithJoi(
+                CreateStudentValidator,
+                input,
+            );
+        // *************** END: Validate and sanitize payload ***************
 
         // *************** START: Execute business logic ***************
         return await CreateStudentHelper(
-            input,
+            validatedInput,
         );
         // *************** END: Execute business logic ***************
     } catch (error) {

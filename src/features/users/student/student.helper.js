@@ -4,13 +4,6 @@ const {
 } = require('./student.model');
 
 const {
-    AcademicYearModel
-} =
-    require(
-        '../../academic/enrollment/academic_year.model'
-    );
-
-const {
     AppError,
 } = require(
     '../../../core/errors'

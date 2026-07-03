@@ -2,7 +2,7 @@
 require('dotenv').config();
 
 // *************** IMPORT MODULE ***************
-const { AppError } = require('./errors');
+const { AppError } = require('./errors/');
 
 // *************** IMPORT HELPER FUNCTION ***************
 /**

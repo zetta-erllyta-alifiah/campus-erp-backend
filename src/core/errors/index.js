@@ -2,11 +2,11 @@
 
 const {
     AppError
-} = require('./AppError');
+} = require('./app_error');
 
 const {
     NormalizeGqlError,
-} = require('./NormalizeGqlError');
+} = require('./normalize_gql_error');
 
 // *************** EXPORT MODULE ***************
 
