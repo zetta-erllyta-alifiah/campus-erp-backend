@@ -47,15 +47,6 @@ const typeDefs = gql`
             input: CreateStudentInput!
         ): Student!
 
-        """
-        Deletes a student and
-        removes all enrollment
-        references from
-        academic years.
-        """
-        DeleteStudent(
-            student_id: ID!
-        ): Boolean!
     }
 `;
 

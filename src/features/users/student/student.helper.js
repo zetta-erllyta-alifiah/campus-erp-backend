@@ -72,73 +72,7 @@ async function CreateStudentHelper(
     );
 }
 
-/**
- * Deletes a student and removes
- * all bidirectional references
- * from academic years.
- *
- * Business rules:
- * - Student must exist.
- * - Student must be removed
- *   from all enrolled
- *   academic years.
- *
- * @param {string} studentId
- *
- * @returns {Promise<boolean>}
- *
- * @throws {AppError}
- */
-async function DeleteStudentHelper(
-    studentId,
-) {
-    // *************** START: Validate student ***************
-    const existingStudent =
-        await StudentModel.findById(
-            studentId,
-        );
-
-    if (!existingStudent) {
-        throw new AppError(
-            'Student not found',
-            'STUDENT_NOT_FOUND',
-            404,
-        );
-    }
-    // *************** END: Validate student ***************
-
-    // *************** START: Maintain bidirectional consistency ***************
-    // Remove student references from
-    // all academic years in which
-    // the student is enrolled.
-    await AcademicYearModel.updateMany(
-        {
-            _id: {
-                $in:
-                    existingStudent.academic_year_ids,
-            },
-        },
-        {
-            $pull: {
-                student_ids:
-                    studentId,
-            },
-        },
-    );
-    // *************** END: Maintain bidirectional consistency ***************
-
-    // *************** START: Delete student ***************
-    await StudentModel.findByIdAndDelete(
-        studentId,
-    );
-    // *************** END: Delete student ***************
-
-    return true;
-}
-
-
 // *************** EXPORT MODULE ***************
 module.exports = {
     CreateStudentHelper,
-    DeleteStudentHelper,
 };

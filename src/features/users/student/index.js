@@ -4,7 +4,6 @@ const typeDefs =
 
 const {
     CreateStudentMutation,
-    DeleteStudentMutation,
 } = require(
     './student.mutation.resolver'
 );
@@ -26,8 +25,6 @@ const resolvers = {
     Mutation: {
         CreateStudent:
             CreateStudentMutation,
-        DeleteStudent:
-            DeleteStudentMutation,
     },
 };
 

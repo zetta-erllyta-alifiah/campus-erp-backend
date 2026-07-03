@@ -70,23 +70,7 @@ async function CreateStudentMutation(
     }
 }
 
-async function DeleteStudentMutation(
-    _,
-    { student_id },
-) {
-    try {
-        return await DeleteStudentHelper(
-            student_id,
-        );
-    } catch (error) {
-        throw NormalizeGqlError(
-            error,
-        );
-    }
-}
-
 // *************** EXPORT MODULE ***************
 module.exports = {
     CreateStudentMutation,
-    DeleteStudentMutation,
 };
