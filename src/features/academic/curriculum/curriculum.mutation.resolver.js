@@ -17,7 +17,7 @@ const {
 const {
     ValidateInputWithJoi,
 } = require(
-    '../../../core/validator'
+    '../../../shared/validator'
 );
 
 const {

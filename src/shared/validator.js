@@ -1,6 +1,6 @@
 // *************** IMPORT MODULE ***************
 const { AppError } =
-    require('./errors');
+    require('../core/errors');
 
 /**
  * Validates payload using
