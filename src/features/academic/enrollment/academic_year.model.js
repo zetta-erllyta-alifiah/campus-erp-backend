@@ -16,37 +16,27 @@ const mongoose =
 const AcademicYearSchema =
     new mongoose.Schema(
         {
-            /**
-             * Academic year name.
-             *
-             * Example:
-             * 2025/2026
-             */
+            // Academic year name in format YYYY/YYYY.
+            // Example: 2025/2026
             name: {
                 type: String,
                 required: true,
                 trim: true,
             },
 
-            /**
-             * Start date.
-             */
+            // The date the academic year begins.
             start_date: {
                 type: Date,
                 required: true,
             },
 
-            /**
-             * End date.
-             */
+            // The date the academic year ends.
             end_date: {
                 type: Date,
                 required: true,
             },
 
-            /**
-             * Academic year status.
-             */
+            // Current lifecycle status of the academic year.
             status: {
                 type: String,
                 enum: [
@@ -57,11 +47,7 @@ const AcademicYearSchema =
                 default: 'active',
             },
 
-            /**
-             * Curriculum blocks
-             * assigned to this
-             * academic year.
-             */
+            // Curriculum block references assigned to this academic year.
             block_ids: {
                 type: [
                     {
@@ -76,9 +62,7 @@ const AcademicYearSchema =
                 required: true,
             },
 
-            /**
-             * Enrolled students.
-             */
+            // Student references enrolled in the academic year.
             student_ids: {
                 type: [
                     {
