@@ -6,9 +6,7 @@ const { AppError } = require('./errors');
 
 /**
  * Creates and configures Apollo Server.
- *
  * @param {Object} options
- *
  * @returns {ApolloServer}
  */
 function CreateApolloServer(options) {

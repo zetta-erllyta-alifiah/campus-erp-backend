@@ -16,7 +16,6 @@
 
 // *************** IMPORT MODULE ***************
 const { BlockModel, SubjectModel, TestModel, StudentGradeModel } = require('./curriculum.model');
-
 const { AppError } = require('../../../core/errors');
 
 // *************** IMPORT HELPER FUNCTION ***************
