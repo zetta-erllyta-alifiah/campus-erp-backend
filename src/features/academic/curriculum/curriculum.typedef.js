@@ -100,21 +100,13 @@ const typeDefs = gql`
 
   type Mutation {
     CreateBlock(input: CreateBlockInput!): Block!
-
     UpdateBlock(block_id: ID!, input: UpdateBlockInput!): Block!
-
     DeleteBlock(block_id: ID!): Boolean!
-
     CreateSubject(input: CreateSubjectInput!): Subject!
-
     UpdateSubject(subject_id: ID!, input: UpdateSubjectInput!): Subject!
-
     DeleteSubject(subject_id: ID!): Boolean!
-
     CreateTest(input: CreateTestInput!): Test!
-
     UpdateTest(test_id: ID!, input: UpdateTestInput!): Test!
-
     DeleteTest(test_id: ID!): Boolean!
   }
 `;

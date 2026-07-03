@@ -1,10 +1,7 @@
 // *************** IMPORT MODULE ***************
 const { CreateStudentHelper } = require('./student.helper');
-
 const { CreateStudentValidator } = require('./student.validator');
-
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
-
 const { NormalizeGqlError } = require('../../../core/errors');
 
 // *************** MUTATION ***************
@@ -21,7 +18,6 @@ const { NormalizeGqlError } = require('../../../core/errors');
  *
  * @param {Object} _
  * @param {Object} args
- *
  * @returns {Promise<Object>}
  */
 async function CreateStudentMutation(_, args) {

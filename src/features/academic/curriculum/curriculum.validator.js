@@ -43,9 +43,7 @@ const objectIdValidator = Joi.string().custom((value, helpers) => {
  */
 const gradingRuleValidator = Joi.object({
   label: Joi.string().trim().required(),
-
   operator: Joi.string().valid('>', '>=', '<', '<=', '==').required(),
-
   threshold: Joi.number().required(),
 });
 
@@ -55,9 +53,7 @@ const gradingRuleValidator = Joi.object({
  */
 const CreateBlockValidator = Joi.object({
   name: Joi.string().trim().required(),
-
   academic_year: Joi.string().trim().required(),
-
   grading_rules: Joi.array().items(gradingRuleValidator).default([]),
 });
 
@@ -69,9 +65,7 @@ const CreateBlockValidator = Joi.object({
  */
 const UpdateBlockValidator = Joi.object({
   name: Joi.string().trim(),
-
   academic_year: Joi.string().trim(),
-
   grading_rules: Joi.array().items(gradingRuleValidator),
 }).min(1);
 
@@ -86,11 +80,8 @@ const UpdateBlockValidator = Joi.object({
  */
 const CreateSubjectValidator = Joi.object({
   name: Joi.string().trim().required(),
-
   block_id: objectIdValidator.required(),
-
   weightage: Joi.number().positive().max(100).required(),
-
   grading_rules: Joi.array().items(gradingRuleValidator).default([]),
 });
 
@@ -102,9 +93,7 @@ const CreateSubjectValidator = Joi.object({
  */
 const UpdateSubjectValidator = Joi.object({
   name: Joi.string().trim(),
-
   weightage: Joi.number().positive().max(100),
-
   grading_rules: Joi.array().items(gradingRuleValidator),
 }).min(1);
 
@@ -118,11 +107,8 @@ const UpdateSubjectValidator = Joi.object({
  */
 const CreateTestValidator = Joi.object({
   name: Joi.string().trim().required(),
-
   subject_id: objectIdValidator.required(),
-
   weightage: Joi.number().positive().max(100).required(),
-
   grading_rules: Joi.array().items(gradingRuleValidator).default([]),
 });
 
@@ -134,9 +120,7 @@ const CreateTestValidator = Joi.object({
  */
 const UpdateTestValidator = Joi.object({
   name: Joi.string().trim(),
-
   weightage: Joi.number().positive().max(100),
-
   grading_rules: Joi.array().items(gradingRuleValidator),
 }).min(1);
 

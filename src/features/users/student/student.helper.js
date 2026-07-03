@@ -1,6 +1,5 @@
 // *************** IMPORT MODULE ***************
 const { StudentModel } = require('./student.model');
-
 const { AppError } = require('../../../core/errors');
 
 // *************** MUTATION ***************
@@ -11,11 +10,8 @@ const { AppError } = require('../../../core/errors');
  * Business rules:
  * - Student email must be unique.
  * - Student number must be unique.
- *
  * @param {Object} input
- *
  * @returns {Promise<Object>}
- *
  * @throws {AppError} 400
  */
 async function CreateStudentHelper(input) {

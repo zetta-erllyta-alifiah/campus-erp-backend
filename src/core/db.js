@@ -8,7 +8,6 @@ const { AppError } = require('./errors/');
 // *************** IMPORT HELPER FUNCTION ***************
 /**
  * Establishes a connection to the MongoDB database.
- *
  * @returns {Promise<void>} Resolves when the database connection is established.
  * @throws {AppError} DATABASE_CONNECTION_FAILED - Failed to connect to MongoDB.
  */

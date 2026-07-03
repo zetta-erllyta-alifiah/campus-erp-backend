@@ -5,24 +5,27 @@ const { expressMiddleware } = require('@as-integrations/express5');
 
 // *************** IMPORT MODULE ***************
 const CreateApolloServer = require('./core/apollo');
-
 const applicationConfig = require('./core/config');
-
 const { ConnectDatabase } = require('./core/db');
-
 const systemGraphQLModule = require('./features/system');
 
 const curriculumModule = require('./features/academic/curriculum');
-
 const studentModule = require('./features/users/student');
-
 const enrollmentModule = require('./features/academic/enrollment');
 
 // *************** GLOBAL VARIABLES ***************
 const graphQLSchema = {
-  typeDefs: [systemGraphQLModule.typeDefs, curriculumModule.typeDefs, studentModule.typeDefs, enrollmentModule.typeDefs],
-
-  resolvers: [systemGraphQLModule.resolvers, curriculumModule.resolvers, studentModule.resolvers, enrollmentModule.resolvers],
+  typeDefs: [
+    systemGraphQLModule.typeDefs, 
+    curriculumModule.typeDefs, 
+    studentModule.typeDefs, 
+    enrollmentModule.typeDefs
+  ], resolvers: [
+    systemGraphQLModule.resolvers,
+    curriculumModule.resolvers, 
+    studentModule.resolvers, 
+    enrollmentModule.resolvers
+  ],
 };
 
 // *************** IMPORT HELPER FUNCTION ***************
@@ -36,7 +39,6 @@ const graphQLSchema = {
  * - Configure middleware.
  * - Start Apollo Server.
  * - Expose GraphQL endpoint.
- *
  * @returns {Promise<void>}
  */
 async function initializeApplication() {

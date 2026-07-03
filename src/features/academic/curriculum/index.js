@@ -32,23 +32,17 @@ const resolvers = {
   Mutation: {
     // Block mutations
     CreateBlock: CreateBlockMutation,
-
     UpdateBlock: UpdateBlockMutation,
-
     DeleteBlock: DeleteBlockMutation,
 
     // Subject mutations
     CreateSubject: CreateSubjectMutation,
-
     UpdateSubject: UpdateSubjectMutation,
-
     DeleteSubject: DeleteSubjectMutation,
 
     // Test mutations
     CreateTest: CreateTestMutation,
-
     UpdateTest: UpdateTestMutation,
-
     DeleteTest: DeleteTestMutation,
   },
 };

@@ -1,6 +1,5 @@
 // *************** IMPORT MODULE ***************
 const typeDefs = require('./enrollment.typedef');
-
 const { EnrollStudentsToYearMutation } = require('./enrollment.mutation.resolver');
 
 // *************** GLOBAL VARIABLES ***************

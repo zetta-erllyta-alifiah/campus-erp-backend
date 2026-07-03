@@ -25,11 +25,8 @@ const Joi = require('joi');
  */
 const CreateStudentValidator = Joi.object({
   first_name: Joi.string().trim().required(),
-
   last_name: Joi.string().trim().required(),
-
   email: Joi.string().email().trim().lowercase().required(),
-
   student_number: Joi.string().trim().required(),
 });
 
@@ -44,11 +41,8 @@ const CreateStudentValidator = Joi.object({
  */
 const UpdateStudentValidator = Joi.object({
   first_name: Joi.string().trim(),
-
   last_name: Joi.string().trim(),
-
   email: Joi.string().email().trim().lowercase(),
-
   student_number: Joi.string().trim(),
 }).min(1);
 

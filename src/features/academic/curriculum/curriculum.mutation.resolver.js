@@ -20,9 +20,11 @@ const {
   CreateBlock,
   UpdateBlock,
   DeleteBlock,
+
   CreateSubject,
   UpdateSubject,
   DeleteSubject,
+
   CreateTest,
   UpdateTest,
   DeleteTest,
@@ -32,7 +34,6 @@ const {
 
 /**
  * Creates a curriculum block.
- *
  * @param {Object} _
  * @param {Object} args
  * @returns {Promise<Object>}
@@ -45,7 +46,6 @@ async function CreateBlockMutation(_, { input }) {
 
 /**
  * Updates a curriculum block.
- *
  * @param {Object} _
  * @param {Object} args
  * @returns {Promise<Object>}
@@ -60,7 +60,6 @@ async function UpdateBlockMutation(_, { block_id, input }) {
 
 /**
  * Deletes a curriculum block.
- *
  * @param {Object} _
  * @param {Object} args
  * @returns {Promise<Boolean>}
@@ -73,7 +72,6 @@ async function DeleteBlockMutation(_, { block_id }) {
 
 /**
  * Creates a subject.
- *
  * @param {Object} _
  * @param {Object} args
  * @returns {Promise<Object>}
@@ -86,7 +84,6 @@ async function CreateSubjectMutation(_, { input }) {
 
 /**
  * Updates a subject.
- *
  * @param {Object} _
  * @param {Object} args
  * @returns {Promise<Object>}
@@ -101,7 +98,6 @@ async function UpdateSubjectMutation(_, { subject_id, input }) {
 
 /**
  * Deletes a subject.
- *
  * @param {Object} _
  * @param {Object} args
  * @returns {Promise<Boolean>}
@@ -114,7 +110,6 @@ async function DeleteSubjectMutation(_, { subject_id }) {
 
 /**
  * Creates a test.
- *
  * @param {Object} _
  * @param {Object} args
  * @returns {Promise<Object>}
@@ -127,7 +122,6 @@ async function CreateTestMutation(_, { input }) {
 
 /**
  * Updates a test.
- *
  * @param {Object} _
  * @param {Object} args
  * @returns {Promise<Object>}
@@ -142,7 +136,6 @@ async function UpdateTestMutation(_, { test_id, input }) {
 
 /**
  * Deletes a test.
- *
  * @param {Object} _
  * @param {Object} args
  * @returns {Promise<Boolean>}

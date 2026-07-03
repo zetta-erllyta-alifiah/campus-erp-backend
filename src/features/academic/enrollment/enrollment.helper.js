@@ -1,8 +1,6 @@
 // *************** IMPORT MODULE ***************
 const { AcademicYearModel } = require('./academic_year.model');
-
 const { StudentModel } = require('../../users/student/student.model');
-
 const { AppError } = require('../../../core/errors/app_error');
 
 // *************** MUTATION ***************
@@ -17,11 +15,8 @@ const { AppError } = require('../../../core/errors/app_error');
  * - All student IDs must exist.
  * - Enrollment update must be
  *   performed bi-directionally.
- *
  * @param {Object} input
- *
  * @returns {Promise<Object>}
- *
  * @throws {AppError}
  */
 async function EnrollStudentsHelper(input) {

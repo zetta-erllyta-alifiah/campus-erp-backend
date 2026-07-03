@@ -29,12 +29,9 @@ const { AppError } = require('../../../core/errors');
  * - Total weightage of siblings
  *   plus incoming weightage
  *   must be <= 100%.
- *
  * @param {number} currentWeightage
  * @param {number} incomingWeightage
- *
  * @returns {void}
- *
  * @throws {AppError}
  */
 function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
@@ -53,12 +50,9 @@ function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
  * - Once a grade exists for a Block,
  *   Subject, or Test, the entity
  *   cannot be updated or deleted.
- *
  * @param {string} entityType
  * @param {string} entityId
- *
  * @returns {Promise<void>}
- *
  * @throws {AppError}
  */
 async function ValidateGradeLock(entityType, entityId) {
@@ -95,9 +89,7 @@ async function ValidateGradeLock(entityType, entityId) {
 
 /**
  * Creates a curriculum block.
- *
  * @param {Object} input
- *
  * @returns {Promise<Object>}
  */
 async function CreateBlock(input) {
@@ -111,12 +103,9 @@ async function CreateBlock(input) {
  * - Block must exist.
  * - Block cannot be updated
  *   if grades already exist.
- *
  * @param {string} blockId
  * @param {Object} input
- *
  * @returns {Promise<Object>}
- *
  * @throws {AppError}
  */
 async function UpdateBlock(blockId, input) {
@@ -147,11 +136,8 @@ async function UpdateBlock(blockId, input) {
  *   if it still contains subjects.
  * - Block cannot be deleted
  *   if grades already exist.
- *
  * @param {string} blockId
- *
  * @returns {Promise<boolean>}
- *
  * @throws {AppError}
  */
 async function DeleteBlock(blockId) {
@@ -187,11 +173,8 @@ async function DeleteBlock(blockId) {
  *   cannot exceed 100%.
  * - Block weightage total
  *   cannot exceed 100%.
- *
  * @param {Object} input
- *
  * @returns {Promise<Object>}
- *
  * @throws {AppError}
  */
 async function CreateSubject(input) {
@@ -234,12 +217,9 @@ async function CreateSubject(input) {
  * - Total sibling weightage
  *   plus new weightage
  *   cannot exceed 100%.
- *
  * @param {string} subjectId
  * @param {Object} input
- *
  * @returns {Promise<Object>}
- *
  * @throws {AppError}
  */
 async function UpdateSubject(subjectId, input) {
@@ -295,11 +275,8 @@ async function UpdateSubject(subjectId, input) {
  *   if tests still exist.
  * - Subject cannot be deleted
  *   if grades already exist.
- *
  * @param {string} subjectId
- *
  * @returns {Promise<boolean>}
- *
  * @throws {AppError}
  */
 async function DeleteSubject(subjectId) {
@@ -334,11 +311,8 @@ async function DeleteSubject(subjectId) {
  * - Total test weightage
  *   within a subject
  *   cannot exceed 100%.
- *
  * @param {Object} input
- *
  * @returns {Promise<Object>}
- *
  * @throws {AppError}
  */
 async function CreateTest(input) {
@@ -372,9 +346,7 @@ async function CreateTest(input) {
  *
  * @param {string} testId
  * @param {Object} input
- *
  * @returns {Promise<Object>}
- *
  * @throws {AppError}
  */
 async function UpdateTest(testId, input) {
@@ -424,11 +396,8 @@ async function UpdateTest(testId, input) {
  * - Test must exist.
  * - Test cannot be deleted
  *   if grades already exist.
- *
  * @param {string} testId
- *
  * @returns {Promise<boolean>}
- *
  * @throws {AppError}
  */
 async function DeleteTest(testId) {

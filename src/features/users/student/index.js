@@ -1,6 +1,5 @@
 // *************** IMPORT MODULE ***************
 const typeDefs = require('./student.typedef');
-
 const { CreateStudentMutation } = require('./student.mutation.resolver');
 
 // *************** GLOBAL VARIABLES ***************

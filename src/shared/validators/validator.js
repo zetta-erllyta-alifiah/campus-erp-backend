@@ -9,12 +9,9 @@ const { AppError } = require('../../core/errors');
  * - Execute Joi validation
  * - Aggregate validation errors
  * - Throw standardized AppError
- *
  * @param {Object} schema
  * @param {Object} payload
- *
  * @returns {Object}
- *
  * @throws {AppError}
  */
 function ValidateInputWithJoi(schema, payload) {

@@ -180,11 +180,8 @@ const StudentGradeSchema = new mongoose.Schema(
 );
 
 const BlockModel = mongoose.model('Block', BlockSchema);
-
 const SubjectModel = mongoose.model('Subject', SubjectSchema);
-
 const TestModel = mongoose.model('Test', TestSchema);
-
 const StudentGradeModel = mongoose.model('StudentGrade', StudentGradeSchema);
 
 // *************** EXPORT MODULE ***************

@@ -14,7 +14,6 @@ const { AppError } = require('./errors');
 function CreateApolloServer(options) {
   return new ApolloServer({
     typeDefs: options.typeDefs,
-
     resolvers: options.resolvers,
 
     formatError(formattedError, error) {

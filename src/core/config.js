@@ -7,7 +7,6 @@ const { AppError } = require('./errors/');
 // *************** IMPORT HELPER FUNCTION ***************
 /**
  * Validates required environment variables.
- *
  * @throws {AppError} CONFIG_MONGO_URI_REQUIRED
  * @throws {AppError} CONFIG_PORT_REQUIRED
  */
