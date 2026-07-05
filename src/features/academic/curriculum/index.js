@@ -1,22 +1,19 @@
 // *************** IMPORT MODULE ***************
-const typeDefs =
-    require('./curriculum.typedef');
+const typeDefs = require('./curriculum.typedef');
 
 const {
-    CreateBlockMutation,
-    UpdateBlockMutation,
-    DeleteBlockMutation,
+  CreateBlockMutation,
+  UpdateBlockMutation,
+  DeleteBlockMutation,
 
-    CreateSubjectMutation,
-    UpdateSubjectMutation,
-    DeleteSubjectMutation,
+  CreateSubjectMutation,
+  UpdateSubjectMutation,
+  DeleteSubjectMutation,
 
-    CreateTestMutation,
-    UpdateTestMutation,
-    DeleteTestMutation,
-} = require(
-    './curriculum.mutation.resolver'
-);
+  CreateTestMutation,
+  UpdateTestMutation,
+  DeleteTestMutation,
+} = require('./curriculum.mutation.resolver');
 
 // *************** GLOBAL VARIABLES ***************
 /**
@@ -32,41 +29,26 @@ const {
  * @type {Object}
  */
 const resolvers = {
-    Mutation: {
-        // Block mutations
-        CreateBlock:
-            CreateBlockMutation,
+  Mutation: {
+    // Block mutations
+    CreateBlock: CreateBlockMutation,
+    UpdateBlock: UpdateBlockMutation,
+    DeleteBlock: DeleteBlockMutation,
 
-        UpdateBlock:
-            UpdateBlockMutation,
+    // Subject mutations
+    CreateSubject: CreateSubjectMutation,
+    UpdateSubject: UpdateSubjectMutation,
+    DeleteSubject: DeleteSubjectMutation,
 
-        DeleteBlock:
-            DeleteBlockMutation,
-
-        // Subject mutations
-        CreateSubject:
-            CreateSubjectMutation,
-
-        UpdateSubject:
-            UpdateSubjectMutation,
-
-        DeleteSubject:
-            DeleteSubjectMutation,
-
-        // Test mutations
-        CreateTest:
-            CreateTestMutation,
-
-        UpdateTest:
-            UpdateTestMutation,
-
-        DeleteTest:
-            DeleteTestMutation,
-    },
+    // Test mutations
+    CreateTest: CreateTestMutation,
+    UpdateTest: UpdateTestMutation,
+    DeleteTest: DeleteTestMutation,
+  },
 };
 
 // *************** EXPORT MODULE ***************
 module.exports = {
-    typeDefs,
-    resolvers,
+  typeDefs,
+  resolvers,
 };
