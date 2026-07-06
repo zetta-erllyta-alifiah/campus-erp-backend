@@ -20,7 +20,7 @@ const graphQLSchema = {
   resolvers: [systemGraphQLModule.resolvers, curriculumModule.resolvers, studentModule.resolvers, enrollmentModule.resolvers],
 };
 
-// *************** IMPORT HELPER FUNCTION ***************
+// *************** APPLICATION BOOTSTRAP ***************
 /**
  * Initializes the application
  * runtime environment.
@@ -33,7 +33,7 @@ const graphQLSchema = {
  * - Expose GraphQL endpoint.
  * @returns {Promise<void>}
  */
-async function initializeApplication() {
+async function InitializeApplication() {
   try {
     // *************** Initialize database connection ***************
     await ConnectDatabase();
@@ -69,4 +69,4 @@ async function initializeApplication() {
 }
 
 // *************** APPLICATION BOOTSTRAP ***************
-initializeApplication();
+InitializeApplication();

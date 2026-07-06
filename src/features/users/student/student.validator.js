@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
  * Custom validator for MongoDB
  * ObjectId values.
  */
-const objectIdValidator = Joi.string().custom((value, helpers) => {
+const ObjectIdValidator = Joi.string().custom((value, helpers) => {
   if (!mongoose.Types.ObjectId.isValid(value)) {
     return helpers.error('any.invalid');
   }
@@ -71,26 +71,25 @@ const UpdateStudentValidator = Joi.object({
  * - page must be >= 1.
  * - limit must be >= 1.
  */
-const GetStudentsByAcademicYearSchema =
-    Joi.object({
-        academic_year_id:
-            objectIdValidator
-                .required(),
+const GetStudentsByAcademicYearSchema = Joi.object({
+  academic_year_id: ObjectIdValidator.required(),
 
-        page: Joi.number()
-            .integer()
-            .min(1)
-            .default(1),
+  page: Joi.number()
+    .integer()
+    .min(1)
+    .default(1),
 
-        limit: Joi.number()
-            .integer()
-            .min(1)
-            .max(100)
-            .default(10),
+  limit: Joi.number()
+    .integer()
+    .min(1)
+    .max(100)
+    .default(10),
 
-        search: Joi.string()
-            .trim(),
-    });
+  search: Joi.string()
+    .trim()
+    .allow('')
+    .optional(),
+});
 
 // *************** EXPORT MODULE ***************
 module.exports = {

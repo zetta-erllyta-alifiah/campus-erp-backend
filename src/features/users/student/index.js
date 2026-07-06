@@ -2,6 +2,7 @@
 const typeDefs = require('./student.typedef');
 const { CreateStudentMutation } = require('./student.mutation.resolver');
 const { GetStudentsByAcademicYearQuery } = require('./student.query.resolver');
+const { StudentAcademicYearsLoader } = require('./student.loader.resolver');
 
 // *************** RESOLVERS ***************
 
@@ -25,9 +26,7 @@ const resolvers = {
     CreateStudent: CreateStudentMutation,
   },
   Student: {
-    academic_years(parent, _, context) {
-      return context.AcademicYearLoader.loadMany(parent.academic_year_ids || []);
-    },
+    academic_years: StudentAcademicYearsLoader,
   },
 };
 

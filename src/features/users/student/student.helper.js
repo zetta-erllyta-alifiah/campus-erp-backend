@@ -97,7 +97,7 @@ async function CreateStudentHelper(input) {
 async function GetStudentsByAcademicYearHelper(input) {
   const academicYearObjectId = new mongoose.Types.ObjectId(input.academic_year_id);
 
-  // *************** START: Build query filters ***************
+  // *************** Build query filters ***************
   const matchStage = {
     academic_year_ids: academicYearObjectId,
   };
