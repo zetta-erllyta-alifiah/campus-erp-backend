@@ -20,7 +20,7 @@ const { AppError } = require('../../../core/errors/app_error');
  * @throws {AppError}
  */
 async function EnrollStudentsHelper(input) {
-  // *************** START: Validate academic year ***************
+  // *************** Validate academic year ***************
   const academicYear = await AcademicYearModel.findById(input.academic_year_id);
 
   if (!academicYear) {
@@ -30,13 +30,11 @@ async function EnrollStudentsHelper(input) {
   if (academicYear.status !== 'active') {
     throw new AppError('Academic year is closed', 'ACADEMIC_YEAR_CLOSED', 400);
   }
-  // *************** END: Validate academic year ***************
 
-  // *************** START: Remove duplicates ***************
+  // *************** Remove duplicate student IDs ***************
   const uniqueStudentIds = [...new Set(input.student_ids.map(String))];
-  // *************** END: Remove duplicates ***************
 
-  // *************** START: Validate student references ***************
+  // *************** Validate student references ***************
   const studentCount = await StudentModel.countDocuments({
     _id: {
       $in: uniqueStudentIds,
@@ -46,9 +44,8 @@ async function EnrollStudentsHelper(input) {
   if (studentCount !== uniqueStudentIds.length) {
     throw new AppError('Invalid student reference', 'INVALID_STUDENT_REFERENCE', 400);
   }
-  // *************** END: Validate student references ***************
 
-  // *************** START: Update academic year ***************
+  // *************** Update academic year enrollment ***************
   const updatedYear = await AcademicYearModel.findByIdAndUpdate(
     input.academic_year_id,
     {
@@ -62,9 +59,8 @@ async function EnrollStudentsHelper(input) {
       new: true,
     },
   );
-  // *************** END: Update academic year ***************
 
-  // *************** START: Update students ***************
+  // *************** Update student academic year references ***************
   await StudentModel.updateMany(
     {
       _id: {
@@ -77,7 +73,6 @@ async function EnrollStudentsHelper(input) {
       },
     },
   );
-  // *************** END: Update students ***************
 
   return updatedYear;
 }

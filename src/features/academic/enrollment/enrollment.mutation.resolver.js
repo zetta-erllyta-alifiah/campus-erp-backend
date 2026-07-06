@@ -24,17 +24,14 @@ const { NormalizeGqlError } = require('../../../core/errors');
  */
 async function EnrollStudentsToYearMutation(_, args) {
   try {
-    // *************** START: Extract payload ***************
+    // *************** Extract input payload ***************
     const { input } = args;
-    // *************** END: Extract payload ***************
 
-    // *************** START: Validate payload ***************
+    // *************** Validate request payload ***************
     ValidateInputWithJoi(CreateEnrollmentValidator, input);
-    // *************** END: Validate payload ***************
 
-    // *************** START: Execute business logic ***************
+    // *************** Execute enrollment business logic ***************
     return await EnrollStudentsHelper(input);
-    // *************** END: Execute business logic ***************
   } catch (error) {
     throw NormalizeGqlError(error);
   }

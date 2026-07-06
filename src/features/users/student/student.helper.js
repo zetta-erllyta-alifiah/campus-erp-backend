@@ -15,7 +15,7 @@ const { AppError } = require('../../../core/errors');
  * @throws {AppError} 400
  */
 async function CreateStudentHelper(input) {
-  // *************** START: Validate email uniqueness ***************
+  // *************** Validate unique email ***************
   const existingEmail = await StudentModel.findOne({
     email: input.email,
   });
@@ -23,9 +23,8 @@ async function CreateStudentHelper(input) {
   if (existingEmail) {
     throw new AppError('Email already exists', 'EMAIL_ALREADY_EXISTS', 400);
   }
-  // *************** END: Validate email uniqueness***************
 
-  // *************** START: Validate student number uniqueness ***************
+  // *************** Validate unique student number ***************
   const existingStudentNumber = await StudentModel.findOne({
     student_number: input.student_number,
   });
@@ -33,7 +32,6 @@ async function CreateStudentHelper(input) {
   if (existingStudentNumber) {
     throw new AppError('Student number already exists', 'STUDENT_NUMBER_ALREADY_EXISTS', 400);
   }
-  // *************** END: Validate student number uniqueness ***************
 
   return StudentModel.create(input);
 }

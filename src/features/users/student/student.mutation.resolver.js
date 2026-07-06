@@ -22,17 +22,14 @@ const { NormalizeGqlError } = require('../../../core/errors');
  */
 async function CreateStudentMutation(_, args) {
   try {
-    // *************** START: Extract payload ***************
+    // *************** Extract input payload ***************
     const { input } = args;
-    // *************** END: Extract payload ***************
 
-    // *************** START: Validate and sanitize payload ***************
+    // *************** Validate and sanitize payload ***************
     const validatedInput = ValidateInputWithJoi(CreateStudentValidator, input);
-    // *************** END: Validate and sanitize payload ***************
 
-    // *************** START: Execute business logic ***************
+    // *************** Execute student creation business logic ***************
     return await CreateStudentHelper(validatedInput);
-    // *************** END: Execute business logic ***************
   } catch (error) {
     throw NormalizeGqlError(error);
   }
