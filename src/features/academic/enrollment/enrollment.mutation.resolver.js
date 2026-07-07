@@ -1,5 +1,7 @@
-// *************** IMPORT MODULE ***************
+// *************** IMPORT HELPER ***************
 const { EnrollStudentsHelper } = require('./enrollment.helper');
+
+// *************** IMPORT UTILITIES ***************
 const { NormalizeGqlError } = require('../../../core/errors');
 
 // *************** MUTATION ***************
