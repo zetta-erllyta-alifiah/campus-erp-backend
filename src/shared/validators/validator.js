@@ -15,15 +15,18 @@ const { AppError } = require('../../core/errors');
  * @throws {AppError}
  */
 function ValidateInputWithJoi(schema, payload) {
+  // *************** Validate the full payload and remove fields not defined by the schema
   const { error, value } = schema.validate(payload, {
     abortEarly: false,
     stripUnknown: true,
   });
 
+  // *************** Convert Joi validation failures into the shared operational error format
   if (error) {
-    throw new AppError(error.details.map((detail) => detail.message).join(', '), 'VALIDATION_ERROR', 400);
+    throw new AppError('VALIDATION_ERROR', 400, error.details.map((detail) => detail.message).join(', '));
   }
 
+  // *************** Return sanitized payload after successful validation
   return value;
 }
 

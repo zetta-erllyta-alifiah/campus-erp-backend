@@ -24,8 +24,8 @@ const typeDefs = gql`
     registration_date: String!
     academic_year_ids: [ID!]!
     academic_years: [AcademicYear!]!
-    createdAt: String!
-    updatedAt: String!
+    created_at: String!
+    updated_at: String!
   }
 
   type PaginatedStudentResponse {

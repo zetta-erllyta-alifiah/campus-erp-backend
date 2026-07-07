@@ -1,7 +1,5 @@
 // *************** IMPORT MODULE ***************
 const { CreateStudentHelper } = require('./student.helper');
-const { CreateStudentValidator } = require('./student.validator');
-const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
 const { NormalizeGqlError } = require('../../../core/errors');
 
 // *************** MUTATION ***************
@@ -12,7 +10,6 @@ const { NormalizeGqlError } = require('../../../core/errors');
  *
  * Flow:
  * - Extract payload
- * - Validate input
  * - Execute business logic
  * - Normalize errors
  *
@@ -25,11 +22,8 @@ async function CreateStudentMutation(_, args) {
     // *************** Extract input payload ***************
     const { input } = args;
 
-    // *************** Validate and sanitize payload ***************
-    const validatedInput = ValidateInputWithJoi(CreateStudentValidator, input);
-
     // *************** Execute student creation business logic ***************
-    return await CreateStudentHelper(validatedInput);
+    return await CreateStudentHelper(input);
   } catch (error) {
     throw NormalizeGqlError(error);
   }

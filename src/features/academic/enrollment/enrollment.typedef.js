@@ -23,8 +23,8 @@ const typeDefs = gql`
     status: String!
     block_ids: [ID!]!
     student_ids: [ID!]!
-    createdAt: String!
-    updatedAt: String!
+    created_at: String!
+    updated_at: String!
   }
 
   """
@@ -43,7 +43,7 @@ const typeDefs = gql`
     students into an
     academic year.
     """
-    EnrollStudentsToYear(input: EnrollStudentsInput!): AcademicYear!
+    EnrollStudentsToYear(input: EnrollStudentsInput!): AcademicYear! @auth(requires: ADMIN)
   }
 `;
 

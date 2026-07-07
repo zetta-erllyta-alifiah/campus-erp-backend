@@ -19,7 +19,7 @@ async function ConnectDatabase() {
   } catch (connectionError) {
     console.error('MongoDB connection failed:', connectionError);
 
-    throw new AppError('Failed to connect to MongoDB', 'DATABASE_CONNECTION_FAILED', 500);
+    throw new AppError('DATABASE_CONNECTION_FAILED', 500, 'Failed to connect to MongoDB');
   }
 }
 

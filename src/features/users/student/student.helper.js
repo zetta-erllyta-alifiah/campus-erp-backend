@@ -6,6 +6,12 @@ const { StudentModel } = require('./student.model');
 const { AppError } = require('../../../core/errors');
 
 // *************** IMPORT UTILITIES ***************
+const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
+
+// *************** IMPORT VALIDATOR ***************
+const { CreateStudentValidator, GetStudentsByAcademicYearSchema } = require('./student.validator');
+
+// *************** IMPORT UTILITIES ***************
 
 /**
  * Escapes regular expression
@@ -31,25 +37,28 @@ function EscapeRegex(value) {
  * @throws {AppError}
  */
 async function CreateStudentHelper(input) {
+  // *************** Validate and sanitize student payload before uniqueness checks
+  const validatedInput = ValidateInputWithJoi(CreateStudentValidator, input);
+
   // *************** Validate unique email ***************
   const existingEmail = await StudentModel.findOne({
-    email: input.email,
+    email: validatedInput.email,
   });
 
   if (existingEmail) {
-    throw new AppError('Email already exists', 'EMAIL_ALREADY_EXISTS', 400);
+    throw new AppError('EMAIL_ALREADY_EXISTS', 400, 'Email already exists');
   }
 
   // *************** Validate unique student number ***************
   const existingStudentNumber = await StudentModel.findOne({
-    student_number: input.student_number,
+    student_number: validatedInput.student_number,
   });
 
   if (existingStudentNumber) {
-    throw new AppError('Student number already exists', 'STUDENT_NUMBER_ALREADY_EXISTS', 400);
+    throw new AppError('STUDENT_NUMBER_ALREADY_EXISTS', 400, 'Student number already exists');
   }
 
-  return StudentModel.create(input);
+  return StudentModel.create(validatedInput);
 }
 
 // *************** QUERY ***************
@@ -95,7 +104,10 @@ async function CreateStudentHelper(input) {
  * }
  */
 async function GetStudentsByAcademicYearHelper(input) {
-  const academicYearObjectId = new mongoose.Types.ObjectId(input.academic_year_id);
+  // *************** Validate and sanitize query payload before building aggregation
+  const validatedInput = ValidateInputWithJoi(GetStudentsByAcademicYearSchema, input);
+
+  const academicYearObjectId = new mongoose.Types.ObjectId(validatedInput.academic_year_id);
 
   // *************** Build query filters ***************
   const matchStage = {
@@ -103,8 +115,8 @@ async function GetStudentsByAcademicYearHelper(input) {
   };
 
   // *************** Apply search filter ***************
-  if (input.search) {
-    const searchKeyword = EscapeRegex(input.search);
+  if (validatedInput.search) {
+    const searchKeyword = EscapeRegex(validatedInput.search);
 
     matchStage.$or = [
       {
@@ -123,8 +135,8 @@ async function GetStudentsByAcademicYearHelper(input) {
   }
 
   // *************** Calculate pagination ***************
-  const page = input.page;
-  const limit = input.limit;
+  const page = validatedInput.page;
+  const limit = validatedInput.limit;
   const skip = (page - 1) * limit;
 
   // *************** Execute aggregation ***************

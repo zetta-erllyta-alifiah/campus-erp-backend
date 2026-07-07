@@ -5,13 +5,13 @@
  *
  * @class
  * @extends Error
- * @param {string} message - Human readable error message.
  * @param {string} code - Internal application error code.
- * @param {number} [httpStatus=500] - HTTP status code.
+ * @param {number} httpStatus - HTTP status code.
+ * @param {string} message - Human readable error message.
  * @param {Object|null} [meta=null] - Additional error metadata.
  */
 class AppError extends Error {
-  constructor(message, code, httpStatus = 500, meta = null) {
+  constructor(code, httpStatus = 500, message = code, meta = null) {
     super(message);
 
     this.name = 'AppError';
