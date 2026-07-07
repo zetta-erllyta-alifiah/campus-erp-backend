@@ -64,7 +64,10 @@ const AcademicYearSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
+    timestamps: {
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
     collection: 'academic_years',
   },
 );

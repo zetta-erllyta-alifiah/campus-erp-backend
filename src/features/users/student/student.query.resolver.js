@@ -1,7 +1,7 @@
-// *************** IMPORT MODULE ***************
-const { GetStudentsByAcademicYearSchema } = require('./student.validator');
+// *************** IMPORT HELPER ***************
 const { GetStudentsByAcademicYearHelper } = require('./student.helper');
-const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
+
+// *************** IMPORT UTILITIES ***************
 const { NormalizeGqlError } = require('../../../core/errors');
 
 // *************** QUERY ***************
@@ -11,7 +11,6 @@ const { NormalizeGqlError } = require('../../../core/errors');
  * academic year.
  *
  * Flow:
- * - Validate input
  * - Execute aggregation helper
  * - Return paginated payload
  *
@@ -22,9 +21,8 @@ const { NormalizeGqlError } = require('../../../core/errors');
 async function GetStudentsByAcademicYearQuery(_, args) {
   try {
     const { input } = args;
-    const validatedInput = ValidateInputWithJoi(GetStudentsByAcademicYearSchema, input);
 
-    return await GetStudentsByAcademicYearHelper(validatedInput);
+    return await GetStudentsByAcademicYearHelper(input);
   } catch (error) {
     throw NormalizeGqlError(error);
   }

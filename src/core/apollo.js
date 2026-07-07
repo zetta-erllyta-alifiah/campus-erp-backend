@@ -1,5 +1,6 @@
 // *************** IMPORT LIBRARY ***************
 const { ApolloServer } = require('@apollo/server');
+const { makeExecutableSchema } = require('@graphql-tools/schema');
 
 // *************** IMPORT MODULE ***************
 const { AppError } = require('./errors');
@@ -10,9 +11,13 @@ const { AppError } = require('./errors');
  * @returns {ApolloServer}
  */
 function CreateApolloServer(options) {
-  return new ApolloServer({
+  const schema = options.schema || makeExecutableSchema({
     typeDefs: options.typeDefs,
     resolvers: options.resolvers,
+  });
+
+  return new ApolloServer({
+    schema,
 
     formatError(formattedError, error) {
       const originalError = error.originalError;

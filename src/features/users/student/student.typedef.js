@@ -12,9 +12,7 @@ const { gql } = require('graphql-tag');
  * - Define Student mutations.
  */
 const typeDefs = gql`
-  """
-  Student profile.
-  """
+  # Student profile.
   type Student {
     _id: ID!
     first_name: String!
@@ -24,8 +22,8 @@ const typeDefs = gql`
     registration_date: String!
     academic_year_ids: [ID!]!
     academic_years: [AcademicYear!]!
-    createdAt: String!
-    updatedAt: String!
+    created_at: String!
+    updated_at: String!
   }
 
   type PaginatedStudentResponse {
@@ -46,10 +44,8 @@ const typeDefs = gql`
     GetStudentsByAcademicYear(input: GetStudentsByAcademicYearInput!): PaginatedStudentResponse!
   }
 
-  """
-  Input payload used to
-  create a student.
-  """
+  # Input payload used to
+  # create a student.
   input CreateStudentInput {
     first_name: String!
     last_name: String!
@@ -58,9 +54,7 @@ const typeDefs = gql`
   }
 
   type Mutation {
-    """
-    Creates a new student.
-    """
+    # Creates a new student.
     CreateStudent(input: CreateStudentInput!): Student!
   }
 `;

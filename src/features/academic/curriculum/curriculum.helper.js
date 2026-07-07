@@ -18,6 +18,24 @@
 const { BlockModel, SubjectModel, TestModel, StudentGradeModel } = require('./curriculum.model');
 const { AppError } = require('../../../core/errors');
 
+// *************** IMPORT VALIDATOR ***************
+const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
+
+const {
+  CreateBlockValidator,
+  UpdateBlockValidator,
+
+  CreateSubjectValidator,
+  UpdateSubjectValidator,
+
+  CreateTestValidator,
+  UpdateTestValidator,
+
+  BlockIdValidator,
+  SubjectIdValidator,
+  TestIdValidator,
+} = require('./curriculum.validator');
+
 // *************** IMPORT HELPER FUNCTION ***************
 
 /**
@@ -34,10 +52,12 @@ const { AppError } = require('../../../core/errors');
  * @throws {AppError}
  */
 function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
+  // *************** Normalize decimal precision before enforcing the 100% limit
   const totalWeightage = Math.round((currentWeightage + incomingWeightage) * 100) / 100;
 
+  // *************** Reject sibling totals that would exceed the curriculum weightage cap
   if (totalWeightage > 100) {
-    throw new AppError('Total weightage exceeds 100%', 'WEIGHTAGE_LIMIT_EXCEEDED', 400);
+    throw new AppError('WEIGHTAGE_LIMIT_EXCEEDED', 400, 'Total weightage exceeds 100%');
   }
 }
 
@@ -57,6 +77,7 @@ function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
 async function ValidateGradeLock(entityType, entityId) {
   let filter = {};
 
+  // *************** Build the grade lookup filter for the entity being changed
   switch (entityType) {
     case 'BLOCK':
       filter = {
@@ -77,10 +98,12 @@ async function ValidateGradeLock(entityType, entityId) {
       break;
   }
 
+  // *************** Check whether any submitted grade already depends on this entity
   const existingGrade = await StudentGradeModel.findOne(filter);
 
+  // *************** Prevent structural changes once grade data exists
   if (existingGrade) {
-    throw new AppError('Entity locked', 'ENTITY_LOCKED_GRADES_EXIST', 409);
+    throw new AppError('ENTITY_LOCKED_GRADES_EXIST', 409, 'Entity locked');
   }
 }
 
@@ -92,7 +115,10 @@ async function ValidateGradeLock(entityType, entityId) {
  * @returns {Promise<Object>}
  */
 async function CreateBlock(input) {
-  return BlockModel.create(input);
+  // *************** Validate and sanitize block payload before persistence
+  const validatedInput = ValidateInputWithJoi(CreateBlockValidator, input);
+
+  return BlockModel.create(validatedInput);
 }
 
 /**
@@ -102,25 +128,28 @@ async function CreateBlock(input) {
  * - Block must exist.
  * - Block cannot be updated
  *   if grades already exist.
+ * 
  * @param {string} blockId
  * @param {Object} input
  * @returns {Promise<Object>}
  * @throws {AppError}
  */
 async function UpdateBlock(blockId, input) {
-  // TODO:
-  // const existingGrade =
-  //     await StudentGradeModel.findOne(...);
+  // *************** Validate and sanitize block id and payload before business rules
+  const validatedId = ValidateInputWithJoi(BlockIdValidator, { block_id: blockId });
+  const validatedInput = ValidateInputWithJoi(UpdateBlockValidator, input);
 
-  const existingBlock = await BlockModel.findById(blockId);
+  // *************** Ensure the target block exists before applying lock validation
+  const existingBlock = await BlockModel.findById(validatedId.block_id);
 
   if (!existingBlock) {
-    throw new AppError('Block not found', 'BLOCK_NOT_FOUND', 404);
+    throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
-  await ValidateGradeLock('BLOCK', blockId);
+  // *************** Protect blocks that already have submitted student grades
+  await ValidateGradeLock('BLOCK', validatedId.block_id);
 
-  return BlockModel.findByIdAndUpdate(blockId, input, {
+  return BlockModel.findByIdAndUpdate(validatedId.block_id, validatedInput, {
     new: true,
     runValidators: true,
   });
@@ -140,23 +169,29 @@ async function UpdateBlock(blockId, input) {
  * @throws {AppError}
  */
 async function DeleteBlock(blockId) {
-  const existingBlock = await BlockModel.findById(blockId);
+  // *************** Validate block id before dependency checks
+  const validatedId = ValidateInputWithJoi(BlockIdValidator, { block_id: blockId });
+
+  // *************** Ensure the target block exists before checking dependencies
+  const existingBlock = await BlockModel.findById(validatedId.block_id);
 
   if (!existingBlock) {
-    throw new AppError('Block not found', 'BLOCK_NOT_FOUND', 404);
+    throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
+  // *************** Prevent deleting a block that still owns subjects
   const existingSubjects = await SubjectModel.exists({
-    block_id: blockId,
+    block_id: validatedId.block_id,
   });
 
   if (existingSubjects) {
-    throw new AppError('Block still contains subjects', 'BLOCK_HAS_SUBJECTS', 409);
+    throw new AppError('BLOCK_HAS_SUBJECTS', 409, 'Block still contains subjects');
   }
 
-  await ValidateGradeLock('BLOCK', blockId);
+  // *************** Protect blocks that already have submitted student grades
+  await ValidateGradeLock('BLOCK', validatedId.block_id);
 
-  await BlockModel.findByIdAndDelete(blockId);
+  await BlockModel.findByIdAndDelete(validatedId.block_id);
 
   return true;
 }
@@ -177,12 +212,17 @@ async function DeleteBlock(blockId) {
  * @throws {AppError}
  */
 async function CreateSubject(input) {
-  const existingBlock = await BlockModel.findById(input.block_id);
+  // *************** Validate and sanitize subject payload before business rules
+  const validatedInput = ValidateInputWithJoi(CreateSubjectValidator, input);
+
+  // *************** Validate that the subject is attached to an existing block
+  const existingBlock = await BlockModel.findById(validatedInput.block_id);
 
   if (!existingBlock) {
-    throw new AppError('Block not found', 'BLOCK_NOT_FOUND', 404);
+    throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
+  // *************** Sum existing subject weightage inside the same block
   const weightageSummary = await SubjectModel.aggregate([
     {
       $match: {
@@ -201,9 +241,10 @@ async function CreateSubject(input) {
 
   const currentWeightage = weightageSummary[0]?.totalWeightage ?? 0;
 
-  ValidateWeightageLimit(currentWeightage, input.weightage);
+  // *************** Ensure the new subject keeps the block total within 100%
+  ValidateWeightageLimit(currentWeightage, validatedInput.weightage);
 
-  return SubjectModel.create(input);
+  return SubjectModel.create(validatedInput);
 }
 
 /**
@@ -222,19 +263,22 @@ async function CreateSubject(input) {
  * @throws {AppError}
  */
 async function UpdateSubject(subjectId, input) {
-  // TODO:
-  // const existingGrade =
-  //     await StudentGradeModel.findOne(...);
+  // *************** Validate and sanitize subject id and payload before business rules
+  const validatedId = ValidateInputWithJoi(SubjectIdValidator, { subject_id: subjectId });
+  const validatedInput = ValidateInputWithJoi(UpdateSubjectValidator, input);
 
-  const existingSubject = await SubjectModel.findById(subjectId);
+  // *************** Ensure the target subject exists before applying lock validation
+  const existingSubject = await SubjectModel.findById(validatedId.subject_id);
 
   if (!existingSubject) {
-    throw new AppError('Subject not found', 'SUBJECT_NOT_FOUND', 404);
+    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
-  await ValidateGradeLock('SUBJECT', subjectId);
+  // *************** Protect subjects that already have submitted student grades
+  await ValidateGradeLock('SUBJECT', validatedId.subject_id);
 
-  if (input.weightage !== undefined) {
+  if (validatedInput.weightage !== undefined) {
+    // *************** Sum sibling subject weightage while excluding the subject being updated
     const weightageSummary = await SubjectModel.aggregate([
       {
         $match: {
@@ -256,10 +300,11 @@ async function UpdateSubject(subjectId, input) {
 
     const currentWeightage = weightageSummary[0]?.totalWeightage ?? 0;
 
-    ValidateWeightageLimit(currentWeightage, input.weightage);
+    // *************** Ensure the updated subject keeps sibling totals within 100%
+    ValidateWeightageLimit(currentWeightage, validatedInput.weightage);
   }
 
-  return SubjectModel.findByIdAndUpdate(subjectId, input, {
+  return SubjectModel.findByIdAndUpdate(validatedId.subject_id, validatedInput, {
     new: true,
     runValidators: true,
   });
@@ -279,23 +324,29 @@ async function UpdateSubject(subjectId, input) {
  * @throws {AppError}
  */
 async function DeleteSubject(subjectId) {
-  const existingSubject = await SubjectModel.findById(subjectId);
+  // *************** Validate subject id before dependency checks
+  const validatedId = ValidateInputWithJoi(SubjectIdValidator, { subject_id: subjectId });
+
+  // *************** Ensure the target subject exists before checking dependencies
+  const existingSubject = await SubjectModel.findById(validatedId.subject_id);
 
   if (!existingSubject) {
-    throw new AppError('Subject not found', 'SUBJECT_NOT_FOUND', 404);
+    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
+  // *************** Prevent deleting a subject that still owns tests
   const existingTests = await TestModel.exists({
-    subject_id: subjectId,
+    subject_id: validatedId.subject_id,
   });
 
   if (existingTests) {
-    throw new AppError('Subject still contains tests', 'SUBJECT_HAS_TESTS', 409);
+    throw new AppError('SUBJECT_HAS_TESTS', 409, 'Subject still contains tests');
   }
 
-  await ValidateGradeLock('SUBJECT', subjectId);
+  // *************** Protect subjects that already have submitted student grades
+  await ValidateGradeLock('SUBJECT', validatedId.subject_id);
 
-  await SubjectModel.findByIdAndDelete(subjectId);
+  await SubjectModel.findByIdAndDelete(validatedId.subject_id);
 
   return true;
 }
@@ -315,21 +366,27 @@ async function DeleteSubject(subjectId) {
  * @throws {AppError}
  */
 async function CreateTest(input) {
-  const existingSubject = await SubjectModel.findById(input.subject_id);
+  // *************** Validate and sanitize test payload before business rules
+  const validatedInput = ValidateInputWithJoi(CreateTestValidator, input);
+
+  // *************** Validate that the test is attached to an existing subject
+  const existingSubject = await SubjectModel.findById(validatedInput.subject_id);
 
   if (!existingSubject) {
-    throw new AppError('Subject not found', 'SUBJECT_NOT_FOUND', 404);
+    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
+  // *************** Load sibling tests to calculate the current subject test total
   const existingTests = await TestModel.find({
-    subject_id: input.subject_id,
+    subject_id: validatedInput.subject_id,
   }).select('weightage');
 
   const totalWeightage = existingTests.reduce((total, currentTest) => total + currentTest.weightage, 0);
 
-  ValidateWeightageLimit(totalWeightage, input.weightage);
+  // *************** Ensure the new test keeps the subject total within 100%
+  ValidateWeightageLimit(totalWeightage, validatedInput.weightage);
 
-  return TestModel.create(input);
+  return TestModel.create(validatedInput);
 }
 
 /**
@@ -349,15 +406,22 @@ async function CreateTest(input) {
  * @throws {AppError}
  */
 async function UpdateTest(testId, input) {
-  const existingTest = await TestModel.findById(testId);
+  // *************** Validate and sanitize test id and payload before business rules
+  const validatedId = ValidateInputWithJoi(TestIdValidator, { test_id: testId });
+  const validatedInput = ValidateInputWithJoi(UpdateTestValidator, input);
+
+  // *************** Ensure the target test exists before applying lock validation
+  const existingTest = await TestModel.findById(validatedId.test_id);
 
   if (!existingTest) {
-    throw new AppError('Test not found', 'TEST_NOT_FOUND', 404);
+    throw new AppError('TEST_NOT_FOUND', 404, 'Test not found');
   }
 
-  await ValidateGradeLock('TEST', testId);
+  // *************** Protect tests that already have submitted student grades
+  await ValidateGradeLock('TEST', validatedId.test_id);
 
-  if (input.weightage !== undefined) {
+  if (validatedInput.weightage !== undefined) {
+    // *************** Sum sibling test weightage while excluding the test being updated
     const weightageSummary = await TestModel.aggregate([
       {
         $match: {
@@ -379,10 +443,11 @@ async function UpdateTest(testId, input) {
 
     const currentWeightage = weightageSummary[0]?.totalWeightage ?? 0;
 
-    ValidateWeightageLimit(currentWeightage, input.weightage);
+    // *************** Ensure the updated test keeps sibling totals within 100%
+    ValidateWeightageLimit(currentWeightage, validatedInput.weightage);
   }
 
-  return TestModel.findByIdAndUpdate(testId, input, {
+  return TestModel.findByIdAndUpdate(validatedId.test_id, validatedInput, {
     new: true,
     runValidators: true,
   });
@@ -400,15 +465,20 @@ async function UpdateTest(testId, input) {
  * @throws {AppError}
  */
 async function DeleteTest(testId) {
-  const existingTest = await TestModel.findById(testId);
+  // *************** Validate test id before lock checks
+  const validatedId = ValidateInputWithJoi(TestIdValidator, { test_id: testId });
+
+  // *************** Ensure the target test exists before applying lock validation
+  const existingTest = await TestModel.findById(validatedId.test_id);
 
   if (!existingTest) {
-    throw new AppError('Test not found', 'TEST_NOT_FOUND', 404);
+    throw new AppError('TEST_NOT_FOUND', 404, 'Test not found');
   }
 
-  await ValidateGradeLock('TEST', testId);
+  // *************** Protect tests that already have submitted student grades
+  await ValidateGradeLock('TEST', validatedId.test_id);
 
-  await TestModel.findByIdAndDelete(testId);
+  await TestModel.findByIdAndDelete(validatedId.test_id);
 
   return true;
 }

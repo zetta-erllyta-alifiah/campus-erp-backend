@@ -28,8 +28,8 @@ const typeDefs = gql`
     name: String!
     academic_year: String!
     grading_rules: [GradingRule!]!
-    createdAt: String!
-    updatedAt: String!
+    created_at: String!
+    updated_at: String!
   }
 
   # Subject entity that belongs to a block
@@ -39,8 +39,8 @@ const typeDefs = gql`
     block_id: ID!
     weightage: Float!
     grading_rules: [GradingRule!]!
-    createdAt: String!
-    updatedAt: String!
+    created_at: String!
+    updated_at: String!
   }
 
   # Test entity that belongs to a subject
@@ -50,8 +50,8 @@ const typeDefs = gql`
     subject_id: ID!
     weightage: Float!
     grading_rules: [GradingRule!]!
-    createdAt: String!
-    updatedAt: String!
+    created_at: String!
+    updated_at: String!
   }
 
   input GradingRuleInput {
@@ -99,13 +99,13 @@ const typeDefs = gql`
   }
 
   type Mutation {
-    CreateBlock(input: CreateBlockInput!): Block!
+    CreateBlock(input: CreateBlockInput!): Block! @auth(requires: ADMIN)
     UpdateBlock(block_id: ID!, input: UpdateBlockInput!): Block!
     DeleteBlock(block_id: ID!): Boolean!
-    CreateSubject(input: CreateSubjectInput!): Subject!
+    CreateSubject(input: CreateSubjectInput!): Subject! @auth(requires: ADMIN)
     UpdateSubject(subject_id: ID!, input: UpdateSubjectInput!): Subject!
     DeleteSubject(subject_id: ID!): Boolean!
-    CreateTest(input: CreateTestInput!): Test!
+    CreateTest(input: CreateTestInput!): Test! @auth(requires: ADMIN)
     UpdateTest(test_id: ID!, input: UpdateTestInput!): Test!
     DeleteTest(test_id: ID!): Boolean!
   }
