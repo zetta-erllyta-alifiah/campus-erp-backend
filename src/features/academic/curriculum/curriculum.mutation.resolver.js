@@ -52,7 +52,6 @@ async function CreateBlockMutation(_, { input }) {
  */
 async function UpdateBlockMutation(_, { block_id, input }) {
   const validatedId = ValidateInputWithJoi(BlockIdValidator, { block_id });
-
   const validatedInput = ValidateInputWithJoi(UpdateBlockValidator, input);
 
   return UpdateBlock(validatedId.block_id, validatedInput);
@@ -90,7 +89,6 @@ async function CreateSubjectMutation(_, { input }) {
  */
 async function UpdateSubjectMutation(_, { subject_id, input }) {
   const validatedId = ValidateInputWithJoi(SubjectIdValidator, { subject_id });
-
   const validatedInput = ValidateInputWithJoi(UpdateSubjectValidator, input);
 
   return UpdateSubject(validatedId.subject_id, validatedInput);

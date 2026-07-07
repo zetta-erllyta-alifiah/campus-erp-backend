@@ -8,6 +8,7 @@ const CreateApolloServer = require('./core/apollo');
 const applicationConfig = require('./core/config');
 const { ConnectDatabase } = require('./core/db');
 const systemGraphQLModule = require('./features/system');
+const { CreateAcademicYearLoader } = require('./loaders/academic_year.loader');
 
 const curriculumModule = require('./features/academic/curriculum');
 const studentModule = require('./features/users/student');
@@ -15,20 +16,11 @@ const enrollmentModule = require('./features/academic/enrollment');
 
 // *************** GLOBAL VARIABLES ***************
 const graphQLSchema = {
-  typeDefs: [
-    systemGraphQLModule.typeDefs, 
-    curriculumModule.typeDefs, 
-    studentModule.typeDefs, 
-    enrollmentModule.typeDefs
-  ], resolvers: [
-    systemGraphQLModule.resolvers,
-    curriculumModule.resolvers, 
-    studentModule.resolvers, 
-    enrollmentModule.resolvers
-  ],
+  typeDefs: [systemGraphQLModule.typeDefs, curriculumModule.typeDefs, studentModule.typeDefs, enrollmentModule.typeDefs],
+  resolvers: [systemGraphQLModule.resolvers, curriculumModule.resolvers, studentModule.resolvers, enrollmentModule.resolvers],
 };
 
-// *************** IMPORT HELPER FUNCTION ***************
+// *************** APPLICATION BOOTSTRAP ***************
 /**
  * Initializes the application
  * runtime environment.
@@ -41,35 +33,34 @@ const graphQLSchema = {
  * - Expose GraphQL endpoint.
  * @returns {Promise<void>}
  */
-async function initializeApplication() {
+async function InitializeApplication() {
   try {
-    // *************** START: Initialize database connection ***************
+    // *************** Initialize database connection ***************
     await ConnectDatabase();
-    // *************** END: Initialize database connection ***************
 
-    // *************** START: Configure Express application ***************
+    // *************** Configure Express application ***************
     const expressApplication = express();
-
     expressApplication.use(cors());
-
     expressApplication.use(express.json());
-    // *************** END: Configure Express application ***************
 
-    // *************** START:Configure Apollo Server ***************
+    // *************** Configure Apollo Server ***************
     const apolloServer = CreateApolloServer(graphQLSchema);
-
     await apolloServer.start();
-    // *************** END: Configure Apollo Server ***************
 
-    // *************** START: Register GraphQL endpoint ***************
-    expressApplication.use('/graphql', expressMiddleware(apolloServer));
-    // *************** END: Register GraphQL endpoint ***************
+    // *************** Register GraphQL endpoint ***************
+    expressApplication.use(
+      '/graphql',
+      expressMiddleware(apolloServer, {
+        context: async () => ({
+          AcademicYearLoader: CreateAcademicYearLoader(),
+        }),
+      }),
+    );
 
-    // *************** START: Start HTTP server ***************
+    // *************** Start HTTP server ***************
     expressApplication.listen(applicationConfig.port, () => {
       console.log(`Server is running on port ${applicationConfig.port}`);
     });
-    // *************** END: Start HTTP server ***************
   } catch (error) {
     console.error(`[${error.httpStatus || 500}] ${error.message}`);
 
@@ -78,4 +69,4 @@ async function initializeApplication() {
 }
 
 // *************** APPLICATION BOOTSTRAP ***************
-initializeApplication();
+InitializeApplication();

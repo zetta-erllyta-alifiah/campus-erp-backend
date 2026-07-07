@@ -16,10 +16,8 @@ const { NormalizeGqlError } = require('../../../core/errors');
  * - Validate input
  * - Execute business logic
  * - Normalize errors
- *
  * @param {Object} _
  * @param {Object} args
- *
  * @returns {Promise<Object>}
  */
 async function EnrollStudentsToYearMutation(_, args) {

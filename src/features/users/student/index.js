@@ -1,8 +1,10 @@
 // *************** IMPORT MODULE ***************
 const typeDefs = require('./student.typedef');
 const { CreateStudentMutation } = require('./student.mutation.resolver');
+const { GetStudentsByAcademicYearQuery } = require('./student.query.resolver');
+const { StudentAcademicYearsLoader } = require('./student.loader.resolver');
 
-// *************** GLOBAL VARIABLES ***************
+// *************** RESOLVERS ***************
 
 /**
  * GraphQL resolver map
@@ -10,14 +12,21 @@ const { CreateStudentMutation } = require('./student.mutation.resolver');
  *
  * Responsibility:
  * - Register transport-layer
- *   mutation handlers.
+ *   mutation and query handlers.
+ * - Register type-level resolvers.
  *
  * Business rules must remain
  * inside helper functions.
  */
 const resolvers = {
+  Query: {
+    GetStudentsByAcademicYear: GetStudentsByAcademicYearQuery,
+  },
   Mutation: {
     CreateStudent: CreateStudentMutation,
+  },
+  Student: {
+    academic_years: StudentAcademicYearsLoader,
   },
 };
 

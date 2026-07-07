@@ -9,7 +9,6 @@ const { AppError } = require('./app_error');
  * into GraphQL errors.
  *
  * @param {Error} error
- *
  * @returns {GraphQLError}
  */
 function NormalizeGqlError(error) {

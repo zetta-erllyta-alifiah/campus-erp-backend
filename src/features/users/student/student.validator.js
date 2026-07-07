@@ -1,8 +1,22 @@
 // *************** IMPORT LIBRARY ***************
 const Joi = require('joi');
+const mongoose = require('mongoose');
 
 // *************** GLOBAL VARIABLES ***************
 
+/**
+ * Custom validator for MongoDB
+ * ObjectId values.
+ */
+const ObjectIdValidator = Joi.string().custom((value, helpers) => {
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    return helpers.error('any.invalid');
+  }
+
+  return value;
+}, 'ObjectId validation');
+
+// *************** VALIDATION SCHEMA ***************
 /**
  * Validation schemas
  * for Student feature.
@@ -46,8 +60,27 @@ const UpdateStudentValidator = Joi.object({
   student_number: Joi.string().trim(),
 }).min(1);
 
+/**
+ * Validation schema for
+ * retrieving students
+ * by academic year.
+ *
+ * Business rules:
+ * - academic_year_id must
+ *   be a valid ObjectId.
+ * - page must be >= 1.
+ * - limit must be >= 1.
+ */
+const GetStudentsByAcademicYearSchema = Joi.object({
+  academic_year_id: ObjectIdValidator.required(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(10),
+  search: Joi.string().trim().allow('').optional(),
+});
+
 // *************** EXPORT MODULE ***************
 module.exports = {
   CreateStudentValidator,
   UpdateStudentValidator,
+  GetStudentsByAcademicYearSchema,
 };
