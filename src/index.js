@@ -73,6 +73,7 @@ async function InitializeApplication() {
       expressMiddleware(apolloServer, {
         context: async ({ req }) => ({
           user: req.user,
+          authError: req.authError,
           AcademicYearLoader: CreateAcademicYearLoader(),
         }),
       }),

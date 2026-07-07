@@ -16,7 +16,7 @@ const ROLE_HIERARCHY = {
   ADMIN: 2,
 };
 
-// *************** MUTATION ***************
+// *************** HELPER FUNCTION ***************
 
 /**
  * Converts persisted role values into GraphQL enum-style role values.
@@ -24,8 +24,30 @@ const ROLE_HIERARCHY = {
  * @param {string} role - Role from directive arguments or JWT payload.
  * @returns {string|undefined} Normalized role value.
  */
-function normalizeRole(role) {
+function NormalizeRole(role) {
   return ROLE_ALIASES[role?.toLowerCase()];
+}
+
+/**
+ * Throws the most specific authentication failure available in GraphQL context.
+ *
+ * @param {Object} context - GraphQL request context.
+ * @returns {void}
+ * @throws {AppError} 401 - Missing, invalid, expired, or inactive JWT.
+ */
+function ThrowAuthenticationError(context) {
+  // *************** Preserve JWT verification failure instead of masking it as missing auth
+  if (context?.authError) {
+    throw new AppError(
+      context.authError.code,
+      context.authError.httpStatus,
+      context.authError.message,
+      context.authError.meta,
+    );
+  }
+
+  // *************** Reject protected fields when no authenticated user context exists
+  throw new AppError('UNAUTHENTICATED', 401, 'Authentication required');
 }
 
 /**
@@ -52,12 +74,12 @@ function AuthDirectiveTransformer(schema, directiveName) {
       fieldConfig.resolve = async function resolveWithAuthorization(source, args, context, info) {
         // *************** Require authenticated user context before resolving protected fields
         if (!context.user) {
-          throw new AppError('UNAUTHENTICATED', 401, 'Authentication required');
+          ThrowAuthenticationError(context);
         }
 
         // *************** Resolve required role from directive and compare it with the user role
-        const requiredRole = normalizeRole(directive.requires || 'ADMIN');
-        const userRole = normalizeRole(context.user.role);
+        const requiredRole = NormalizeRole(directive.requires || 'ADMIN');
+        const userRole = NormalizeRole(context.user.role);
 
         // *************** Reject users whose role is lower than the required directive role
         if ((ROLE_HIERARCHY[userRole] || 0) < (ROLE_HIERARCHY[requiredRole] || 0)) {
