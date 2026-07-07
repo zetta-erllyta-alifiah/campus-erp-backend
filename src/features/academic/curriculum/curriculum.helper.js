@@ -18,10 +18,9 @@
 const { BlockModel, SubjectModel, TestModel, StudentGradeModel } = require('./curriculum.model');
 const { AppError } = require('../../../core/errors');
 
-// *************** IMPORT UTILITIES ***************
+// *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
 
-// *************** IMPORT VALIDATOR ***************
 const {
   CreateBlockValidator,
   UpdateBlockValidator,

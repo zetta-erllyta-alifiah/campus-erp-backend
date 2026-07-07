@@ -12,9 +12,7 @@ const { gql } = require('graphql-tag');
  * - Define enrollment mutation.
  */
 const typeDefs = gql`
-  """
-  Academic year entity.
-  """
+  # Academic year entity.
   type AcademicYear {
     _id: ID!
     name: String!
@@ -27,22 +25,18 @@ const typeDefs = gql`
     updated_at: String!
   }
 
-  """
-  Input payload used to
-  enroll students into
-  an academic year.
-  """
+  # Input payload used to
+  # enroll students into
+  # an academic year.
   input EnrollStudentsInput {
     academic_year_id: ID!
     student_ids: [ID!]!
   }
 
   type Mutation {
-    """
-    Enrolls one or more
-    students into an
-    academic year.
-    """
+    # Enrolls one or more
+    # students into an
+    # academic year.
     EnrollStudentsToYear(input: EnrollStudentsInput!): AcademicYear! @auth(requires: ADMIN)
   }
 `;

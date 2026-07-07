@@ -1,5 +1,7 @@
-// *************** IMPORT MODULE ***************
+// *************** IMPORT HELPER ***************
 const { GetStudentsByAcademicYearHelper } = require('./student.helper');
+
+// *************** IMPORT UTILITIES ***************
 const { NormalizeGqlError } = require('../../../core/errors');
 
 // *************** QUERY ***************

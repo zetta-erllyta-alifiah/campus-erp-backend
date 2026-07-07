@@ -1,4 +1,4 @@
-// *************** IMPORT MODULE ***************
+// *************** IMPORT HELPER ***************
 const {
   CreateBlock,
   UpdateBlock,

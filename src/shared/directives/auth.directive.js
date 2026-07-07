@@ -9,8 +9,6 @@ const { AppError } = require('../../core/errors');
 const ROLE_ALIASES = {
   admin: 'ADMIN',
   teacher: 'TEACHER',
-  ADMIN: 'ADMIN',
-  TEACHER: 'TEACHER',
 };
 
 const ROLE_HIERARCHY = {
@@ -27,7 +25,7 @@ const ROLE_HIERARCHY = {
  * @returns {string|undefined} Normalized role value.
  */
 function normalizeRole(role) {
-  return ROLE_ALIASES[role];
+  return ROLE_ALIASES[role?.toLowerCase()];
 }
 
 /**

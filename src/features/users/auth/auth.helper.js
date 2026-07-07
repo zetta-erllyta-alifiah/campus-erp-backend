@@ -6,10 +6,9 @@ const jwt = require('jsonwebtoken');
 const { AppError } = require('../../../core/errors');
 const { UserModel } = require('../user/user.model');
 
-// *************** IMPORT UTILITIES ***************
+// *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
 
-// *************** IMPORT VALIDATOR ***************
 const { LoginValidator } = require('./auth.validator');
 
 // *************** MUTATION ***************

@@ -5,13 +5,11 @@ const mongoose = require('mongoose');
 const { StudentModel } = require('./student.model');
 const { AppError } = require('../../../core/errors');
 
-// *************** IMPORT UTILITIES ***************
-const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
-
 // *************** IMPORT VALIDATOR ***************
+const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
 const { CreateStudentValidator, GetStudentsByAcademicYearSchema } = require('./student.validator');
 
-// *************** IMPORT UTILITIES ***************
+// *************** IMPORT HELPER FUNCTION ***************
 
 /**
  * Escapes regular expression
