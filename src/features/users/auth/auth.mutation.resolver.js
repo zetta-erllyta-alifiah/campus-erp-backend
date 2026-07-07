@@ -1,5 +1,7 @@
-// *************** IMPORT MODULE ***************
+// *************** IMPORT HELPER ***************
 const { LoginHelper } = require('./auth.helper');
+
+// *************** IMPORT UTILITIES ***************
 const { NormalizeGqlError } = require('../../../core/errors');
 
 // *************** MUTATION ***************
