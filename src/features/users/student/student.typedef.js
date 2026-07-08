@@ -55,7 +55,7 @@ const typeDefs = gql`
 
   type Mutation {
     # Creates a new student.
-    CreateStudent(input: CreateStudentInput!): Student!
+    CreateStudent(input: CreateStudentInput!): Student! @auth(requires: ADMIN)
   }
 `;
 

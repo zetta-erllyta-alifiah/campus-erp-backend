@@ -15,6 +15,7 @@ const { CreateAcademicYearLoader } = require('./loaders/academic_year.loader');
 const curriculumModule = require('./features/academic/curriculum');
 const studentModule = require('./features/users/student');
 const enrollmentModule = require('./features/academic/enrollment');
+const gradingModule = require('./features/academic/grading');
 const authModule = require('./features/users/auth');
 const AuthMiddleware = require('./shared/middlewares/auth.middleware');
 const { AuthDirectiveTransformer } = require('./shared/directives/auth.directive');
@@ -30,8 +31,23 @@ const directiveTypeDefs = gql`
 `;
 
 const graphQLSchema = {
-  typeDefs: [directiveTypeDefs, systemGraphQLModule.typeDefs, curriculumModule.typeDefs, studentModule.typeDefs, enrollmentModule.typeDefs, authModule.typeDefs],
-  resolvers: [systemGraphQLModule.resolvers, curriculumModule.resolvers, studentModule.resolvers, enrollmentModule.resolvers, authModule.resolvers],
+  typeDefs: [
+    directiveTypeDefs,
+    systemGraphQLModule.typeDefs,
+    curriculumModule.typeDefs,
+    studentModule.typeDefs,
+    enrollmentModule.typeDefs,
+    gradingModule.typeDefs,
+    authModule.typeDefs,
+  ],
+  resolvers: [
+    systemGraphQLModule.resolvers,
+    curriculumModule.resolvers,
+    studentModule.resolvers,
+    enrollmentModule.resolvers,
+    gradingModule.resolvers,
+    authModule.resolvers,
+  ],
 };
 
 // *************** APPLICATION BOOTSTRAP ***************
