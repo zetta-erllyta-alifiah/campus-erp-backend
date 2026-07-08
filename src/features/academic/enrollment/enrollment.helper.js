@@ -1,7 +1,7 @@
 // *************** IMPORT MODULE ***************
 const { AcademicYearModel } = require('./academic_year.model');
 const { StudentModel } = require('../../users/student/student.model');
-const { AppError } = require('../../../core/errors/app_error');
+const { CreateGraphQLError } = require('../../../core/errors');
 
 // *************** IMPORT UTILITIES ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -23,7 +23,7 @@ const { CreateEnrollmentValidator } = require('./enrollment.validator');
  *   performed bi-directionally.
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function EnrollStudentsHelper(input) {
   // *************** Validate and sanitize enrollment payload before business rules
@@ -33,11 +33,11 @@ async function EnrollStudentsHelper(input) {
   const academicYear = await AcademicYearModel.findById(validatedInput.academic_year_id);
 
   if (!academicYear) {
-    throw new AppError('ACADEMIC_YEAR_NOT_FOUND', 404, 'Academic year not found');
+    throw CreateGraphQLError('ACADEMIC_YEAR_NOT_FOUND', 404, 'Academic year not found');
   }
 
   if (academicYear.status !== 'active') {
-    throw new AppError('ACADEMIC_YEAR_CLOSED', 400, 'Academic year is closed');
+    throw CreateGraphQLError('ACADEMIC_YEAR_CLOSED', 400, 'Academic year is closed');
   }
 
   // *************** Remove duplicate student IDs ***************
@@ -51,7 +51,7 @@ async function EnrollStudentsHelper(input) {
   });
 
   if (studentCount !== uniqueStudentIds.length) {
-    throw new AppError('INVALID_STUDENT_REFERENCE', 400, 'Invalid student reference');
+    throw CreateGraphQLError('INVALID_STUDENT_REFERENCE', 400, 'Invalid student reference');
   }
 
   // *************** Update academic year enrollment ***************

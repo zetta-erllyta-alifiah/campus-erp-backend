@@ -16,7 +16,7 @@
 
 // *************** IMPORT MODULE ***************
 const { BlockModel, SubjectModel, TestModel, StudentGradeModel } = require('./curriculum.model');
-const { AppError } = require('../../../core/errors');
+const { CreateGraphQLError } = require('../../../core/errors');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -49,7 +49,7 @@ const {
  * @param {number} currentWeightage
  * @param {number} incomingWeightage
  * @returns {void}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
   // *************** Normalize decimal precision before enforcing the 100% limit
@@ -57,7 +57,7 @@ function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
 
   // *************** Reject sibling totals that would exceed the curriculum weightage cap
   if (totalWeightage > 100) {
-    throw new AppError('WEIGHTAGE_LIMIT_EXCEEDED', 400, 'Total weightage exceeds 100%');
+    throw CreateGraphQLError('WEIGHTAGE_LIMIT_EXCEEDED', 400, 'Total weightage exceeds 100%');
   }
 }
 
@@ -72,7 +72,7 @@ function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
  * @param {string} entityType
  * @param {string} entityId
  * @returns {Promise<void>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function ValidateGradeLock(entityType, entityId) {
   let filter = {};
@@ -103,7 +103,7 @@ async function ValidateGradeLock(entityType, entityId) {
 
   // *************** Prevent structural changes once grade data exists
   if (existingGrade) {
-    throw new AppError('ENTITY_LOCKED_GRADES_EXIST', 409, 'Entity locked');
+    throw CreateGraphQLError('ENTITY_LOCKED_GRADES_EXIST', 409, 'Entity locked');
   }
 }
 
@@ -132,7 +132,7 @@ async function CreateBlock(input) {
  * @param {string} blockId
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function UpdateBlock(blockId, input) {
   // *************** Validate and sanitize block id and payload before business rules
@@ -143,7 +143,7 @@ async function UpdateBlock(blockId, input) {
   const existingBlock = await BlockModel.findById(validatedId.block_id);
 
   if (!existingBlock) {
-    throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
+    throw CreateGraphQLError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
   // *************** Protect blocks that already have submitted student grades
@@ -166,7 +166,7 @@ async function UpdateBlock(blockId, input) {
  *   if grades already exist.
  * @param {string} blockId
  * @returns {Promise<boolean>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function DeleteBlock(blockId) {
   // *************** Validate block id before dependency checks
@@ -176,7 +176,7 @@ async function DeleteBlock(blockId) {
   const existingBlock = await BlockModel.findById(validatedId.block_id);
 
   if (!existingBlock) {
-    throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
+    throw CreateGraphQLError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
   // *************** Prevent deleting a block that still owns subjects
@@ -185,7 +185,7 @@ async function DeleteBlock(blockId) {
   });
 
   if (existingSubjects) {
-    throw new AppError('BLOCK_HAS_SUBJECTS', 409, 'Block still contains subjects');
+    throw CreateGraphQLError('BLOCK_HAS_SUBJECTS', 409, 'Block still contains subjects');
   }
 
   // *************** Protect blocks that already have submitted student grades
@@ -209,7 +209,7 @@ async function DeleteBlock(blockId) {
  *   cannot exceed 100%.
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function CreateSubject(input) {
   // *************** Validate and sanitize subject payload before business rules
@@ -219,7 +219,7 @@ async function CreateSubject(input) {
   const existingBlock = await BlockModel.findById(validatedInput.block_id);
 
   if (!existingBlock) {
-    throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
+    throw CreateGraphQLError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
   // *************** Sum existing subject weightage inside the same block
@@ -260,7 +260,7 @@ async function CreateSubject(input) {
  * @param {string} subjectId
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function UpdateSubject(subjectId, input) {
   // *************** Validate and sanitize subject id and payload before business rules
@@ -271,7 +271,7 @@ async function UpdateSubject(subjectId, input) {
   const existingSubject = await SubjectModel.findById(validatedId.subject_id);
 
   if (!existingSubject) {
-    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
+    throw CreateGraphQLError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
   // *************** Protect subjects that already have submitted student grades
@@ -321,7 +321,7 @@ async function UpdateSubject(subjectId, input) {
  *   if grades already exist.
  * @param {string} subjectId
  * @returns {Promise<boolean>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function DeleteSubject(subjectId) {
   // *************** Validate subject id before dependency checks
@@ -331,7 +331,7 @@ async function DeleteSubject(subjectId) {
   const existingSubject = await SubjectModel.findById(validatedId.subject_id);
 
   if (!existingSubject) {
-    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
+    throw CreateGraphQLError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
   // *************** Prevent deleting a subject that still owns tests
@@ -340,7 +340,7 @@ async function DeleteSubject(subjectId) {
   });
 
   if (existingTests) {
-    throw new AppError('SUBJECT_HAS_TESTS', 409, 'Subject still contains tests');
+    throw CreateGraphQLError('SUBJECT_HAS_TESTS', 409, 'Subject still contains tests');
   }
 
   // *************** Protect subjects that already have submitted student grades
@@ -363,7 +363,7 @@ async function DeleteSubject(subjectId) {
  *   cannot exceed 100%.
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function CreateTest(input) {
   // *************** Validate and sanitize test payload before business rules
@@ -373,7 +373,7 @@ async function CreateTest(input) {
   const existingSubject = await SubjectModel.findById(validatedInput.subject_id);
 
   if (!existingSubject) {
-    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
+    throw CreateGraphQLError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
   // *************** Load sibling tests to calculate the current subject test total
@@ -403,7 +403,7 @@ async function CreateTest(input) {
  * @param {string} testId
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function UpdateTest(testId, input) {
   // *************** Validate and sanitize test id and payload before business rules
@@ -414,7 +414,7 @@ async function UpdateTest(testId, input) {
   const existingTest = await TestModel.findById(validatedId.test_id);
 
   if (!existingTest) {
-    throw new AppError('TEST_NOT_FOUND', 404, 'Test not found');
+    throw CreateGraphQLError('TEST_NOT_FOUND', 404, 'Test not found');
   }
 
   // *************** Protect tests that already have submitted student grades
@@ -462,7 +462,7 @@ async function UpdateTest(testId, input) {
  *   if grades already exist.
  * @param {string} testId
  * @returns {Promise<boolean>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function DeleteTest(testId) {
   // *************** Validate test id before lock checks
@@ -472,7 +472,7 @@ async function DeleteTest(testId) {
   const existingTest = await TestModel.findById(validatedId.test_id);
 
   if (!existingTest) {
-    throw new AppError('TEST_NOT_FOUND', 404, 'Test not found');
+    throw CreateGraphQLError('TEST_NOT_FOUND', 404, 'Test not found');
   }
 
   // *************** Protect tests that already have submitted student grades
@@ -497,3 +497,4 @@ module.exports = {
   UpdateTest,
   DeleteTest,
 };
+

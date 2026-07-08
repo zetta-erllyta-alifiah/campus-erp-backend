@@ -3,13 +3,13 @@ const mongoose = require('mongoose');
 
 // *************** IMPORT MODULE ***************
 const applicationConfig = require('./config');
-const { AppError } = require('./errors/');
+const { CreateGraphQLError } = require('./errors/');
 
 // *************** IMPORT HELPER FUNCTION ***************
 /**
  * Establishes a connection to the MongoDB database.
  * @returns {Promise<void>} Resolves when the database connection is established.
- * @throws {AppError} DATABASE_CONNECTION_FAILED - Failed to connect to MongoDB.
+ * @throws {GraphQLError} DATABASE_CONNECTION_FAILED - Failed to connect to MongoDB.
  */
 async function ConnectDatabase() {
   try {
@@ -19,7 +19,7 @@ async function ConnectDatabase() {
   } catch (connectionError) {
     console.error('MongoDB connection failed:', connectionError);
 
-    throw new AppError('DATABASE_CONNECTION_FAILED', 500, 'Failed to connect to MongoDB');
+    throw CreateGraphQLError('DATABASE_CONNECTION_FAILED', 500, 'Failed to connect to MongoDB');
   }
 }
 

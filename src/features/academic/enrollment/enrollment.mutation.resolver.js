@@ -2,7 +2,7 @@
 const { EnrollStudentsHelper } = require('./enrollment.helper');
 
 // *************** IMPORT UTILITIES ***************
-const { NormalizeGqlError } = require('../../../core/errors');
+const { LogAndNormalizeGqlError } = require('../../../core/errors');
 
 // *************** MUTATION ***************
 
@@ -27,7 +27,7 @@ async function EnrollStudentsToYearMutation(_, args) {
     // *************** Execute enrollment business logic ***************
     return await EnrollStudentsHelper(input);
   } catch (error) {
-    throw NormalizeGqlError(error);
+    throw await LogAndNormalizeGqlError(error, { source: 'EnrollStudentsToYearMutation' });
   }
 }
 

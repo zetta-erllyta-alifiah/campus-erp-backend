@@ -84,7 +84,7 @@ async function InitializeApplication() {
       console.log(`Server is running on port ${applicationConfig.port}`);
     });
   } catch (error) {
-    console.error(`[${error.httpStatus || 500}] ${error.message}`);
+    console.error(`[${error.extensions?.httpStatus || 500}] ${error.message}`);
 
     process.exit(1);
   }

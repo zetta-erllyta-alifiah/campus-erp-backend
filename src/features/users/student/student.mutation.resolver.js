@@ -2,7 +2,7 @@
 const { CreateStudentHelper } = require('./student.helper');
 
 // *************** IMPORT UTILITIES ***************
-const { NormalizeGqlError } = require('../../../core/errors');
+const { LogAndNormalizeGqlError } = require('../../../core/errors');
 
 // *************** MUTATION ***************
 
@@ -27,7 +27,7 @@ async function CreateStudentMutation(_, args) {
     // *************** Execute student creation business logic ***************
     return await CreateStudentHelper(input);
   } catch (error) {
-    throw NormalizeGqlError(error);
+    throw await LogAndNormalizeGqlError(error, { source: 'CreateStudentMutation' });
   }
 }
 

@@ -1,5 +1,5 @@
 // *************** IMPORT MODULE ***************
-const { AppError } = require('../../core/errors');
+const { CreateGraphQLError } = require('../../core/errors');
 
 /**
  * Validates payload using
@@ -8,11 +8,11 @@ const { AppError } = require('../../core/errors');
  * Responsibilities:
  * - Execute Joi validation
  * - Aggregate validation errors
- * - Throw standardized AppError
+ * - Throw standardized GraphQLError
  * @param {Object} schema
  * @param {Object} payload
  * @returns {Object}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 function ValidateInputWithJoi(schema, payload) {
   // *************** Validate the full payload and remove fields not defined by the schema
@@ -23,7 +23,7 @@ function ValidateInputWithJoi(schema, payload) {
 
   // *************** Convert Joi validation failures into the shared operational error format
   if (error) {
-    throw new AppError('VALIDATION_ERROR', 400, error.details.map((detail) => detail.message).join(', '));
+    throw CreateGraphQLError('VALIDATION_ERROR', 400, error.details.map((detail) => detail.message).join(', '));
   }
 
   // *************** Return sanitized payload after successful validation

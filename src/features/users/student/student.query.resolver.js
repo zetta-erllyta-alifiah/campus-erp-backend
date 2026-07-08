@@ -2,7 +2,7 @@
 const { GetStudentsByAcademicYearHelper } = require('./student.helper');
 
 // *************** IMPORT UTILITIES ***************
-const { NormalizeGqlError } = require('../../../core/errors');
+const { LogAndNormalizeGqlError } = require('../../../core/errors');
 
 // *************** QUERY ***************
 /**
@@ -24,7 +24,7 @@ async function GetStudentsByAcademicYearQuery(_, args) {
 
     return await GetStudentsByAcademicYearHelper(input);
   } catch (error) {
-    throw NormalizeGqlError(error);
+    throw await LogAndNormalizeGqlError(error, { source: 'GetStudentsByAcademicYearQuery' });
   }
 }
 
