@@ -14,9 +14,12 @@
  * - Hierarchical deletion protection
  */
 
+// *************** IMPORT LIBRARY ***************
+const { GraphQLError } = require('graphql');
+
 // *************** IMPORT MODULE ***************
-const { BlockModel, SubjectModel, TestModel, StudentGradeModel } = require('./curriculum.model');
-const { CreateGraphQLError } = require('../../../core/errors');
+const { BlockModel, SubjectModel, TestModel } = require('./curriculum.model');
+const { StudentGradeModel } = require('../grading/student_grade.model');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -36,7 +39,7 @@ const {
   TestIdValidator,
 } = require('./curriculum.validator');
 
-// *************** IMPORT HELPER FUNCTION ***************
+// *************** HELPER FUNCTION ***************
 
 /**
  * Validates that the accumulated
@@ -57,7 +60,13 @@ function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
 
   // *************** Reject sibling totals that would exceed the curriculum weightage cap
   if (totalWeightage > 100) {
-    throw CreateGraphQLError('WEIGHTAGE_LIMIT_EXCEEDED', 400, 'Total weightage exceeds 100%');
+    throw new GraphQLError('Total weightage exceeds 100%', {
+      extensions: {
+        code: 'WEIGHTAGE_LIMIT_EXCEEDED',
+        httpStatus: 400,
+        meta: null,
+      },
+    });
   }
 }
 
@@ -75,35 +84,65 @@ function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
  * @throws {GraphQLError}
  */
 async function ValidateGradeLock(entityType, entityId) {
-  let filter = {};
+  let lockedTestIds = [];
 
-  // *************** Build the grade lookup filter for the entity being changed
+  // *************** Resolve the related test ids for the entity being changed
   switch (entityType) {
-    case 'BLOCK':
-      filter = {
+    case 'BLOCK': {
+      const subjects = await SubjectModel.find({
         block_id: entityId,
-      };
-      break;
+      }).select('_id').lean();
 
-    case 'SUBJECT':
-      filter = {
-        subject_id: entityId,
-      };
+      const subjectIds = subjects.map((subject) => subject._id);
+
+      if (subjectIds.length === 0) {
+        return;
+      }
+
+      const tests = await TestModel.find({
+        subject_id: {
+          $in: subjectIds,
+        },
+      }).select('_id').lean();
+
+      lockedTestIds = tests.map((test) => test._id);
       break;
+    }
+
+    case 'SUBJECT': {
+      const tests = await TestModel.find({
+        subject_id: entityId,
+      }).select('_id').lean();
+
+      lockedTestIds = tests.map((test) => test._id);
+      break;
+    }
 
     case 'TEST':
-      filter = {
-        test_id: entityId,
-      };
+      lockedTestIds = [entityId];
       break;
   }
 
+  if (lockedTestIds.length === 0) {
+    return;
+  }
+
   // *************** Check whether any submitted grade already depends on this entity
-  const existingGrade = await StudentGradeModel.findOne(filter);
+  const existingGrade = await StudentGradeModel.exists({
+    test_id: {
+      $in: lockedTestIds,
+    },
+  });
 
   // *************** Prevent structural changes once grade data exists
   if (existingGrade) {
-    throw CreateGraphQLError('ENTITY_LOCKED_GRADES_EXIST', 409, 'Entity locked');
+    throw new GraphQLError('Entity locked', {
+      extensions: {
+        code: 'ENTITY_LOCKED_GRADES_EXIST',
+        httpStatus: 409,
+        meta: null,
+      },
+    });
   }
 }
 
@@ -143,7 +182,13 @@ async function UpdateBlock(blockId, input) {
   const existingBlock = await BlockModel.findById(validatedId.block_id);
 
   if (!existingBlock) {
-    throw CreateGraphQLError('BLOCK_NOT_FOUND', 404, 'Block not found');
+    throw new GraphQLError('Block not found', {
+      extensions: {
+        code: 'BLOCK_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   // *************** Protect blocks that already have submitted student grades
@@ -176,7 +221,13 @@ async function DeleteBlock(blockId) {
   const existingBlock = await BlockModel.findById(validatedId.block_id);
 
   if (!existingBlock) {
-    throw CreateGraphQLError('BLOCK_NOT_FOUND', 404, 'Block not found');
+    throw new GraphQLError('Block not found', {
+      extensions: {
+        code: 'BLOCK_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   // *************** Prevent deleting a block that still owns subjects
@@ -185,7 +236,13 @@ async function DeleteBlock(blockId) {
   });
 
   if (existingSubjects) {
-    throw CreateGraphQLError('BLOCK_HAS_SUBJECTS', 409, 'Block still contains subjects');
+    throw new GraphQLError('Block still contains subjects', {
+      extensions: {
+        code: 'BLOCK_HAS_SUBJECTS',
+        httpStatus: 409,
+        meta: null,
+      },
+    });
   }
 
   // *************** Protect blocks that already have submitted student grades
@@ -219,7 +276,13 @@ async function CreateSubject(input) {
   const existingBlock = await BlockModel.findById(validatedInput.block_id);
 
   if (!existingBlock) {
-    throw CreateGraphQLError('BLOCK_NOT_FOUND', 404, 'Block not found');
+    throw new GraphQLError('Block not found', {
+      extensions: {
+        code: 'BLOCK_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   // *************** Sum existing subject weightage inside the same block
@@ -271,7 +334,13 @@ async function UpdateSubject(subjectId, input) {
   const existingSubject = await SubjectModel.findById(validatedId.subject_id);
 
   if (!existingSubject) {
-    throw CreateGraphQLError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
+    throw new GraphQLError('Subject not found', {
+      extensions: {
+        code: 'SUBJECT_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   // *************** Protect subjects that already have submitted student grades
@@ -331,7 +400,13 @@ async function DeleteSubject(subjectId) {
   const existingSubject = await SubjectModel.findById(validatedId.subject_id);
 
   if (!existingSubject) {
-    throw CreateGraphQLError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
+    throw new GraphQLError('Subject not found', {
+      extensions: {
+        code: 'SUBJECT_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   // *************** Prevent deleting a subject that still owns tests
@@ -340,7 +415,13 @@ async function DeleteSubject(subjectId) {
   });
 
   if (existingTests) {
-    throw CreateGraphQLError('SUBJECT_HAS_TESTS', 409, 'Subject still contains tests');
+    throw new GraphQLError('Subject still contains tests', {
+      extensions: {
+        code: 'SUBJECT_HAS_TESTS',
+        httpStatus: 409,
+        meta: null,
+      },
+    });
   }
 
   // *************** Protect subjects that already have submitted student grades
@@ -373,7 +454,13 @@ async function CreateTest(input) {
   const existingSubject = await SubjectModel.findById(validatedInput.subject_id);
 
   if (!existingSubject) {
-    throw CreateGraphQLError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
+    throw new GraphQLError('Subject not found', {
+      extensions: {
+        code: 'SUBJECT_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   // *************** Load sibling tests to calculate the current subject test total
@@ -414,7 +501,13 @@ async function UpdateTest(testId, input) {
   const existingTest = await TestModel.findById(validatedId.test_id);
 
   if (!existingTest) {
-    throw CreateGraphQLError('TEST_NOT_FOUND', 404, 'Test not found');
+    throw new GraphQLError('Test not found', {
+      extensions: {
+        code: 'TEST_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   // *************** Protect tests that already have submitted student grades
@@ -472,7 +565,13 @@ async function DeleteTest(testId) {
   const existingTest = await TestModel.findById(validatedId.test_id);
 
   if (!existingTest) {
-    throw CreateGraphQLError('TEST_NOT_FOUND', 404, 'Test not found');
+    throw new GraphQLError('Test not found', {
+      extensions: {
+        code: 'TEST_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   // *************** Protect tests that already have submitted student grades

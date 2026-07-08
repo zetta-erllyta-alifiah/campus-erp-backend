@@ -1,9 +1,9 @@
 // *************** IMPORT LIBRARY ***************
 const mongoose = require('mongoose');
+const { GraphQLError } = require('graphql');
 
 // *************** IMPORT MODULE ***************
 const { StudentModel } = require('./student.model');
-const { CreateGraphQLError } = require('../../../core/errors');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -44,7 +44,13 @@ async function CreateStudentHelper(input) {
   });
 
   if (existingEmail) {
-    throw CreateGraphQLError('EMAIL_ALREADY_EXISTS', 400, 'Email already exists');
+    throw new GraphQLError('Email already exists', {
+      extensions: {
+        code: 'EMAIL_ALREADY_EXISTS',
+        httpStatus: 400,
+        meta: null,
+      },
+    });
   }
 
   // *************** Validate unique student number ***************
@@ -53,7 +59,13 @@ async function CreateStudentHelper(input) {
   });
 
   if (existingStudentNumber) {
-    throw CreateGraphQLError('STUDENT_NUMBER_ALREADY_EXISTS', 400, 'Student number already exists');
+    throw new GraphQLError('Student number already exists', {
+      extensions: {
+        code: 'STUDENT_NUMBER_ALREADY_EXISTS',
+        httpStatus: 400,
+        meta: null,
+      },
+    });
   }
 
   return StudentModel.create(validatedInput);

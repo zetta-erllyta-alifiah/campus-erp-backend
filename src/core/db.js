@@ -1,9 +1,9 @@
 // *************** IMPORT LIBRARY ***************
 const mongoose = require('mongoose');
+const { GraphQLError } = require('graphql');
 
 // *************** IMPORT MODULE ***************
 const applicationConfig = require('./config');
-const { CreateGraphQLError } = require('./errors/');
 
 // *************** IMPORT HELPER FUNCTION ***************
 /**
@@ -19,7 +19,13 @@ async function ConnectDatabase() {
   } catch (connectionError) {
     console.error('MongoDB connection failed:', connectionError);
 
-    throw CreateGraphQLError('DATABASE_CONNECTION_FAILED', 500, 'Failed to connect to MongoDB');
+    throw new GraphQLError('Failed to connect to MongoDB', {
+      extensions: {
+        code: 'DATABASE_CONNECTION_FAILED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
   }
 }
 

@@ -1,9 +1,6 @@
 // *************** IMPORT LIBRARY ***************
 const { mapSchema, getDirective, MapperKind } = require('@graphql-tools/utils');
-const { defaultFieldResolver } = require('graphql');
-
-// *************** IMPORT MODULE ***************
-const { CreateGraphQLError } = require('../../core/errors');
+const { defaultFieldResolver, GraphQLError } = require('graphql');
 
 // *************** GLOBAL VARIABLES ***************
 const ROLE_ALIASES = {
@@ -38,16 +35,23 @@ function NormalizeRole(role) {
 function ThrowAuthenticationError(context) {
   // *************** Preserve JWT verification failure instead of masking it as missing auth
   if (context?.authError) {
-    throw CreateGraphQLError(
-      context.authError.code,
-      context.authError.httpStatus,
-      context.authError.message,
-      context.authError.meta,
-    );
+    throw new GraphQLError(context.authError.message, {
+      extensions: {
+        code: context.authError.code,
+        httpStatus: context.authError.httpStatus,
+        meta: context.authError.meta,
+      },
+    });
   }
 
   // *************** Reject protected fields when no authenticated user context exists
-  throw CreateGraphQLError('UNAUTHENTICATED', 401, 'Authentication required');
+  throw new GraphQLError('Authentication required', {
+    extensions: {
+      code: 'UNAUTHENTICATED',
+      httpStatus: 401,
+      meta: null,
+    },
+  });
 }
 
 /**
@@ -83,7 +87,13 @@ function AuthDirectiveTransformer(schema, directiveName) {
 
         // *************** Reject users whose role is lower than the required directive role
         if ((ROLE_HIERARCHY[userRole] || 0) < (ROLE_HIERARCHY[requiredRole] || 0)) {
-          throw CreateGraphQLError('FORBIDDEN', 403, 'Forbidden');
+          throw new GraphQLError('Forbidden', {
+            extensions: {
+              code: 'FORBIDDEN',
+              httpStatus: 403,
+              meta: null,
+            },
+          });
         }
 
         // *************** Continue to the original resolver after authorization succeeds

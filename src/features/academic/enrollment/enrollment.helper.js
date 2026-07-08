@@ -1,7 +1,9 @@
+// *************** IMPORT LIBRARY ***************
+const { GraphQLError } = require('graphql');
+
 // *************** IMPORT MODULE ***************
 const { AcademicYearModel } = require('./academic_year.model');
 const { StudentModel } = require('../../users/student/student.model');
-const { CreateGraphQLError } = require('../../../core/errors');
 
 // *************** IMPORT UTILITIES ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -33,11 +35,23 @@ async function EnrollStudentsHelper(input) {
   const academicYear = await AcademicYearModel.findById(validatedInput.academic_year_id);
 
   if (!academicYear) {
-    throw CreateGraphQLError('ACADEMIC_YEAR_NOT_FOUND', 404, 'Academic year not found');
+    throw new GraphQLError('Academic year not found', {
+      extensions: {
+        code: 'ACADEMIC_YEAR_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   if (academicYear.status !== 'active') {
-    throw CreateGraphQLError('ACADEMIC_YEAR_CLOSED', 400, 'Academic year is closed');
+    throw new GraphQLError('Academic year is closed', {
+      extensions: {
+        code: 'ACADEMIC_YEAR_CLOSED',
+        httpStatus: 400,
+        meta: null,
+      },
+    });
   }
 
   // *************** Remove duplicate student IDs ***************
@@ -51,7 +65,13 @@ async function EnrollStudentsHelper(input) {
   });
 
   if (studentCount !== uniqueStudentIds.length) {
-    throw CreateGraphQLError('INVALID_STUDENT_REFERENCE', 400, 'Invalid student reference');
+    throw new GraphQLError('Invalid student reference', {
+      extensions: {
+        code: 'INVALID_STUDENT_REFERENCE',
+        httpStatus: 400,
+        meta: null,
+      },
+    });
   }
 
   // *************** Update academic year enrollment ***************
