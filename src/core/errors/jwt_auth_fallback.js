@@ -1,5 +1,5 @@
-// *************** IMPORT MODULE ***************
-const { CreateGraphQLError } = require('./normalize_gql_error');
+// *************** IMPORT LIBRARY ***************
+const { GraphQLError } = require('graphql');
 
 // *************** GLOBAL VARIABLES ***************
 const JWT_AUTH_FALLBACK_REASONS = {
@@ -23,8 +23,14 @@ function NormalizeJwtAuthFallback(error) {
   const errorName = error?.name || 'UnknownJwtError';
   const fallbackReason = JWT_AUTH_FALLBACK_REASONS[errorName] || 'JWT_VERIFICATION_FAILED';
 
-  return CreateGraphQLError(fallbackReason, 401, 'JWT verification failed.', {
-    reason: errorName,
+  return new GraphQLError('JWT verification failed.', {
+    extensions: {
+      code: fallbackReason,
+      httpStatus: 401,
+      meta: {
+        reason: errorName,
+      },
+    },
   });
 }
 

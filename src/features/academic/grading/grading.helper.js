@@ -1,9 +1,11 @@
+// *************** IMPORT LIBRARY ***************
+const { GraphQLError } = require('graphql');
+
 // *************** IMPORT MODULE ***************
 const { TestModel } = require('../curriculum/curriculum.model');
 const { AcademicYearModel } = require('../enrollment/academic_year.model');
 const { StudentModel } = require('../../users/student/student.model');
 const { StudentGradeModel } = require('./student_grade.model');
-const { CreateGraphQLError } = require('../../../core/errors');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -22,8 +24,9 @@ const { SubmitTestGradesSchema } = require('./grading.validator');
  * @throws {GraphQLError} 404 - Test or academic year not found.
  */
 async function SubmitTestGradesHelper(input) {
-  // *************** Validate input payload ***************
+  // *************** START: Validate input payload ***************
   const validatedInput = ValidateInputWithJoi(SubmitTestGradesSchema, input);
+  // *************** END: Validate input payload ***************
 
   // *************** START: Validate curriculum and cohort references ***************
   const [existingTest, existingAcademicYear] = await Promise.all([
@@ -32,11 +35,23 @@ async function SubmitTestGradesHelper(input) {
   ]);
 
   if (!existingTest) {
-    throw CreateGraphQLError('TEST_NOT_FOUND', 404, 'Test not found');
+    throw new GraphQLError('Test not found', {
+      extensions: {
+        code: 'TEST_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
 
   if (!existingAcademicYear) {
-    throw CreateGraphQLError('ACADEMIC_YEAR_NOT_FOUND', 404, 'Academic year not found');
+    throw new GraphQLError('Academic year not found', {
+      extensions: {
+        code: 'ACADEMIC_YEAR_NOT_FOUND',
+        httpStatus: 404,
+        meta: null,
+      },
+    });
   }
   // *************** END: Validate curriculum and cohort references ***************
 
@@ -45,7 +60,13 @@ async function SubmitTestGradesHelper(input) {
   const uniqueStudentIds = [...new Set(extractedStudentIds)];
 
   if (uniqueStudentIds.length !== extractedStudentIds.length) {
-    throw CreateGraphQLError('DUPLICATE_STUDENT_GRADE_INPUT', 400, 'Duplicate student grade input');
+    throw new GraphQLError('Duplicate student grade input', {
+      extensions: {
+        code: 'DUPLICATE_STUDENT_GRADE_INPUT',
+        httpStatus: 400,
+        meta: null,
+      },
+    });
   }
 
   const enrolledStudentIdSet = new Set(existingAcademicYear.student_ids.map((studentId) => String(studentId)));
@@ -55,6 +76,16 @@ async function SubmitTestGradesHelper(input) {
     },
   }).select('_id').lean();
   const validStudentIdSet = new Set(validStudents.map((student) => String(student._id)));
+
+  const existingGrades = await StudentGradeModel.find({
+    academic_year_id: validatedInput.academic_year_id,
+    test_id: validatedInput.test_id,
+    student_id: {
+      $in: uniqueStudentIds,
+    },
+  }).select('student_id').lean();
+
+  const existingGradeStudentIdSet = new Set(existingGrades.map((grade) => String(grade.student_id)));
   // *************** END: Prepare student reference validation ***************
 
   // *************** START: Pre-validate every grade before bulk insert ***************
@@ -62,11 +93,33 @@ async function SubmitTestGradesHelper(input) {
     const studentId = String(grade.student_id);
 
     if (!validStudentIdSet.has(studentId)) {
-      throw CreateGraphQLError('INVALID_STUDENT_REFERENCE', 400, 'Invalid student reference');
+      throw new GraphQLError('Invalid student reference', {
+        extensions: {
+          code: 'INVALID_STUDENT_REFERENCE',
+          httpStatus: 400,
+          meta: null,
+        },
+      });
     }
 
     if (!enrolledStudentIdSet.has(studentId)) {
-      throw CreateGraphQLError('STUDENT_NOT_ENROLLED_IN_ACADEMIC_YEAR', 400, 'Student is not enrolled in academic year');
+      throw new GraphQLError('Student is not enrolled in academic year', {
+        extensions: {
+          code: 'STUDENT_NOT_ENROLLED_IN_ACADEMIC_YEAR',
+          httpStatus: 400,
+          meta: null,
+        },
+      });
+    }
+
+    if (existingGradeStudentIdSet.has(studentId)) {
+      throw new GraphQLError('Student grade already exists', {
+        extensions: {
+          code: 'DUPLICATE_STUDENT_GRADE',
+          httpStatus: 409,
+          meta: null,
+        },
+      });
     }
   }
   // *************** END: Pre-validate every grade before bulk insert ***************

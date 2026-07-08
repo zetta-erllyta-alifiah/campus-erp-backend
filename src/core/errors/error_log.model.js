@@ -19,7 +19,7 @@ const ErrorLogSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Stable error code identifier (e.g., AppError.code). Enables filtering and analytics.
+    // Stable GraphQL error code identifier. Enables filtering and analytics.
     code: {
       type: String,
       required: true,
@@ -74,4 +74,3 @@ const ErrorLogModel = mongoose.model('ErrorLog', ErrorLogSchema);
 module.exports = {
   ErrorLogModel,
 };
-

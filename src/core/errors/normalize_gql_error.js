@@ -5,25 +5,6 @@ const { GraphQLError } = require('graphql');
 const { ErrorLogModel } = require('./error_log.model');
 
 /**
- * Creates a standardized GraphQL error.
- *
- * @param {string} code
- * @param {number} httpStatus
- * @param {string} message
- * @param {Object|null} [meta=null]
- * @returns {GraphQLError}
- */
-function CreateGraphQLError(code, httpStatus = 500, message = code, meta = null) {
-  return new GraphQLError(message, {
-    extensions: {
-      code,
-      httpStatus,
-      meta,
-    },
-  });
-}
-
-/**
  * Converts unknown errors into GraphQL errors.
  *
  * @param {Error} error
@@ -34,7 +15,26 @@ function NormalizeGqlError(error) {
     return error;
   }
 
-  return CreateGraphQLError('INTERNAL_SERVER_ERROR', 500, error.message || 'Internal server error');
+  if (error?.code === 11000) {
+    return new GraphQLError('Duplicate record already exists', {
+      extensions: {
+        code: 'DUPLICATE_KEY',
+        httpStatus: 409,
+        meta: {
+          keyPattern: error.keyPattern || null,
+          keyValue: error.keyValue || null,
+        },
+      },
+    });
+  }
+
+  return new GraphQLError(error.message || 'Internal server error', {
+    extensions: {
+      code: 'INTERNAL_SERVER_ERROR',
+      httpStatus: 500,
+      meta: null,
+    },
+  });
 }
 
 /**
@@ -65,7 +65,6 @@ async function LogAndNormalizeGqlError(error, context = {}) {
 }
 
 module.exports = {
-  CreateGraphQLError,
   NormalizeGqlError,
   LogAndNormalizeGqlError,
 };
