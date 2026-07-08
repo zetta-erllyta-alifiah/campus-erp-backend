@@ -1,9 +1,9 @@
 // *************** IMPORT LIBRARY ***************
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { GraphQLError } = require('graphql');
 
 // *************** IMPORT MODULE ***************
-const { CreateGraphQLError } = require('../../../core/errors');
 const { UserModel } = require('../user/user.model');
 
 // *************** IMPORT VALIDATOR ***************
@@ -31,7 +31,13 @@ async function LoginHelper(input) {
 
   // *************** Return a generic auth error to avoid exposing which credential failed
   if (!user) {
-    throw CreateGraphQLError('UNAUTHORIZED', 401, 'Invalid email or password');
+    throw new GraphQLError('Invalid email or password', {
+      extensions: {
+        code: 'UNAUTHORIZED',
+        httpStatus: 401,
+        meta: null,
+      },
+    });
   }
 
   // *************** Compare the submitted password against the stored password hash
@@ -39,7 +45,13 @@ async function LoginHelper(input) {
 
   // *************** Keep the same generic auth error for invalid password attempts
   if (!isPasswordValid) {
-    throw CreateGraphQLError('UNAUTHORIZED', 401, 'Invalid email or password');
+    throw new GraphQLError('Invalid email or password', {
+      extensions: {
+        code: 'UNAUTHORIZED',
+        httpStatus: 401,
+        meta: null,
+      },
+    });
   }
 
   // *************** Sign the access token with identity and role claims for authorization
