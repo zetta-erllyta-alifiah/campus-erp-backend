@@ -1,20 +1,8 @@
 // *************** IMPORT LIBRARY ***************
 const Joi = require('joi');
-const mongoose = require('mongoose');
 
-// *************** GLOBAL VARIABLES ***************
-
-/**
- * Custom validator for MongoDB
- * ObjectId values.
- */
-const objectIdValidator = Joi.string().custom((value, helpers) => {
-  if (!mongoose.Types.ObjectId.isValid(value)) {
-    return helpers.error('any.invalid');
-  }
-
-  return value;
-}, 'ObjectId validation');
+// *************** IMPORT VALIDATOR ***************
+const { ObjectIdValidator } = require('../../../shared/validators/validator');
 
 /**
  * Validation schema for creating
@@ -28,9 +16,9 @@ const objectIdValidator = Joi.string().custom((value, helpers) => {
  *   MongoDB ObjectId.
  */
 const CreateEnrollmentValidator = Joi.object({
-  academic_year_id: objectIdValidator.required(),
+  academic_year_id: ObjectIdValidator.required(),
 
-  student_ids: Joi.array().items(objectIdValidator).min(1).required(),
+  student_ids: Joi.array().items(ObjectIdValidator).min(1).required(),
 });
 
 /**
@@ -43,7 +31,7 @@ const CreateEnrollmentValidator = Joi.object({
  *   MongoDB ObjectId.
  */
 const UpdateEnrollmentValidator = Joi.object({
-  student_ids: Joi.array().items(objectIdValidator).min(1),
+  student_ids: Joi.array().items(ObjectIdValidator).min(1),
 }).min(1);
 
 // *************** EXPORT MODULE ***************

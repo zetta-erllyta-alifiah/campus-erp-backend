@@ -1,6 +1,8 @@
 // *************** IMPORT LIBRARY ***************
 const Joi = require('joi');
-const mongoose = require('mongoose');
+
+// *************** IMPORT VALIDATOR ***************
+const { ObjectIdValidator } = require('../../../shared/validators/validator');
 
 /**
  * Curriculum validation schemas.
@@ -16,20 +18,6 @@ const mongoose = require('mongoose');
  * - Weightage validation
  * - Grading rule validation
  */
-
-/// *************** SHARED VALIDATORS ***************
-/**
- * Validates MongoDB ObjectId.
- *
- * @type {Joi.StringSchema}
- */
-const objectIdValidator = Joi.string().custom((value, helpers) => {
-  if (!mongoose.Types.ObjectId.isValid(value)) {
-    return helpers.error('any.invalid');
-  }
-
-  return value;
-}, 'ObjectId validation');
 
 /**
  * Validates grading rule objects.
@@ -80,7 +68,7 @@ const UpdateBlockValidator = Joi.object({
  */
 const CreateSubjectValidator = Joi.object({
   name: Joi.string().trim().required(),
-  block_id: objectIdValidator.required(),
+  block_id: ObjectIdValidator.required(),
   weightage: Joi.number().positive().max(100).required(),
   grading_rules: Joi.array().items(gradingRuleValidator).default([]),
 });
@@ -107,7 +95,7 @@ const UpdateSubjectValidator = Joi.object({
  */
 const CreateTestValidator = Joi.object({
   name: Joi.string().trim().required(),
-  subject_id: objectIdValidator.required(),
+  subject_id: ObjectIdValidator.required(),
   weightage: Joi.number().positive().max(100).required(),
   grading_rules: Joi.array().items(gradingRuleValidator).default([]),
 });
@@ -128,21 +116,21 @@ const UpdateTestValidator = Joi.object({
  * Validates block identifier.
  */
 const BlockIdValidator = Joi.object({
-  block_id: objectIdValidator.required(),
+  block_id: ObjectIdValidator.required(),
 });
 
 /**
  * Validates subject identifier.
  */
 const SubjectIdValidator = Joi.object({
-  subject_id: objectIdValidator.required(),
+  subject_id: ObjectIdValidator.required(),
 });
 
 /**
  * Validates test identifier.
  */
 const TestIdValidator = Joi.object({
-  test_id: objectIdValidator.required(),
+  test_id: ObjectIdValidator.required(),
 });
 
 // *************** EXPORT MODULE ***************
