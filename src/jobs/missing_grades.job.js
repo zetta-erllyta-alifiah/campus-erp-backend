@@ -1,3 +1,12 @@
+/**
+ * Missing grade auditor cron job.
+ *
+ * Responsibility:
+ * - Scan active academic years for missing student grades.
+ * - Send teacher email alerts once per missing grade event.
+ * - Persist notification locks so repeated cron runs stay idempotent.
+ */
+
 // *************** IMPORT LIBRARY ***************
 const cron = require('node-cron');
 
@@ -9,8 +18,14 @@ const { ErrorLogModel } = require('../core/errors/error_log.model');
 const { SendEmail } = require('../shared/services/email.service');
 
 // *************** GLOBAL VARIABLES ***************
+
+// Background notification type stored in notification log locks.
 const MISSING_GRADE_ALERT = 'MISSING_GRADE_ALERT';
+
+// Cached node-cron task instance used to prevent duplicate scheduler registration.
 let gradeAuditorTask = null;
+
+// Runtime guard used to skip overlapping audit executions.
 let isGradeAuditorRunning = false;
 
 // *************** JOB HELPER FUNCTION ***************
@@ -24,6 +39,7 @@ let isGradeAuditorRunning = false;
  */
 async function LogMissingGradeJobError(error, meta = null) {
   try {
+    // *************** Persist cron failures for later operational review
     await ErrorLogModel.create({
       message: error.message || 'Missing grade auditor failed',
       code: error.code || 'MISSING_GRADE_AUDITOR_ERROR',
@@ -33,6 +49,7 @@ async function LogMissingGradeJobError(error, meta = null) {
       meta,
     });
   } catch (logError) {
+    // *************** Keep the cron process alive even when error logging fails
     console.error('Missing grade auditor log failed:', logError);
   }
 }
@@ -45,11 +62,13 @@ async function LogMissingGradeJobError(error, meta = null) {
  */
 async function FindMissingGradeRecords() {
   return AcademicYearModel.aggregate([
+    // *************** Limit the cron audit to active academic years
     {
       $match: {
         status: 'active',
       },
     },
+    // *************** Expand enrolled students and curriculum blocks into audit candidates
     {
       $unwind: '$student_ids',
     },
@@ -78,6 +97,7 @@ async function FindMissingGradeRecords() {
     {
       $unwind: '$test_data',
     },
+    // *************** Join submitted grades to detect missing student/test entries
     {
       $lookup: {
         from: 'student_grades',
@@ -115,6 +135,7 @@ async function FindMissingGradeRecords() {
         },
       },
     },
+    // *************** Join notification locks to avoid resending existing alerts
     {
       $lookup: {
         from: 'notification_logs',
@@ -155,6 +176,7 @@ async function FindMissingGradeRecords() {
         },
       },
     },
+    // *************** Attach student display data required by the alert email
     {
       $lookup: {
         from: 'students',
@@ -166,6 +188,7 @@ async function FindMissingGradeRecords() {
     {
       $unwind: '$student_data',
     },
+    // *************** Shape the cron audit result into email-ready missing grade records
     {
       $project: {
         _id: 0,
@@ -190,6 +213,7 @@ async function FindMissingGradeRecords() {
  * @returns {string} HTML email body.
  */
 function BuildMissingGradeEmailBody(missingGrade) {
+  // *************** Build the display name once for the teacher notification
   const studentName = `${missingGrade.student_first_name} ${missingGrade.student_last_name}`.trim();
 
   return `
@@ -228,6 +252,7 @@ function IsDuplicateNotificationLockError(error) {
  */
 async function CreateMissingGradeNotificationLock(missingGrade) {
   try {
+    // *************** Create an idempotency lock before sending the cron email
     await NotificationLogModel.create({
       type: MISSING_GRADE_ALERT,
       student_id: missingGrade.student_id,
@@ -237,6 +262,7 @@ async function CreateMissingGradeNotificationLock(missingGrade) {
 
     return true;
   } catch (lockError) {
+    // *************** Skip this alert when another cron process already created the lock
     if (IsDuplicateNotificationLockError(lockError)) {
       return false;
     }
@@ -252,6 +278,7 @@ async function CreateMissingGradeNotificationLock(missingGrade) {
  * @returns {Promise<void>}
  */
 async function EnsureNotificationLogIndexes() {
+  // *************** Initialize the unique lock index before cron execution begins
   await NotificationLogModel.init();
 }
 
@@ -261,6 +288,7 @@ async function EnsureNotificationLogIndexes() {
  * @returns {Promise<void>}
  */
 async function RunMissingGradeAudit() {
+  // *************** Prevent a long-running audit from overlapping with the next cron tick
   if (isGradeAuditorRunning) {
     return;
   }
@@ -268,6 +296,7 @@ async function RunMissingGradeAudit() {
   isGradeAuditorRunning = true;
 
   try {
+    // *************** START: Resolve teacher notification recipient ***************
     const teacherUser = await UserModel.findOne({
       role: 'teacher',
     }).select('email').lean();
@@ -278,9 +307,13 @@ async function RunMissingGradeAudit() {
       });
       return;
     }
+    // *************** END: Resolve teacher notification recipient ***************
 
+    // *************** START: Find missing grade events that have not been alerted ***************
     const missingGrades = await FindMissingGradeRecords();
+    // *************** END: Find missing grade events that have not been alerted ***************
 
+    // *************** START: Send one idempotent alert per missing grade event ***************
     for (const missingGrade of missingGrades) {
       try {
         const notificationLockCreated = await CreateMissingGradeNotificationLock(missingGrade);
@@ -302,9 +335,11 @@ async function RunMissingGradeAudit() {
         });
       }
     }
+    // *************** END: Send one idempotent alert per missing grade event ***************
   } catch (jobError) {
     await LogMissingGradeJobError(jobError);
   } finally {
+    // *************** Release the runtime guard after each cron audit attempt
     isGradeAuditorRunning = false;
   }
 }
@@ -315,16 +350,20 @@ async function RunMissingGradeAudit() {
  * @returns {Promise<Object>} node-cron scheduled task.
  */
 async function InitializeGradeAuditorJob() {
+  // *************** Reuse the existing scheduler when the application initializes more than once
   if (gradeAuditorTask) {
     return gradeAuditorTask;
   }
 
+  // *************** Prepare notification lock indexes before registering the cron task
   await EnsureNotificationLogIndexes();
 
+  // *************** Run the missing grade auditor once every minute
   gradeAuditorTask = cron.schedule('* * * * *', async () => {
     await RunMissingGradeAudit();
   });
 
+  // *************** Log scheduler readiness for application startup visibility
   console.log('Missing grade auditor job initialized');
 
   return gradeAuditorTask;
