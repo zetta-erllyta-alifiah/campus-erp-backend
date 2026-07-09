@@ -40,13 +40,14 @@ function AuthMiddleware(request, response, next) {
   } catch (error) {
     // *************** Convert JWT verification failure into structured non-blocking auth context
     const authError = NormalizeJwtAuthFallback(error);
+    const extensions = authError.extensions || {};
 
     // *************** Preserve fallback metadata without exposing token or stack details
     request.authError = {
-      code: authError.code,
-      httpStatus: authError.httpStatus,
+      code: extensions.code,
+      httpStatus: extensions.httpStatus,
       message: authError.message,
-      meta: authError.meta,
+      meta: extensions.meta,
     };
 
     // *************** Treat invalid or expired tokens as anonymous requests

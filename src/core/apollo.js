@@ -2,9 +2,6 @@
 const { ApolloServer } = require('@apollo/server');
 const { makeExecutableSchema } = require('@graphql-tools/schema');
 
-// *************** IMPORT MODULE ***************
-const { AppError } = require('./errors');
-
 /**
  * Creates and configures Apollo Server.
  * @param {Object} options
@@ -20,19 +17,6 @@ function CreateApolloServer(options) {
     schema,
 
     formatError(formattedError, error) {
-      const originalError = error.originalError;
-
-      if (originalError instanceof AppError) {
-        return {
-          message: originalError.message,
-          extensions: {
-            code: originalError.code,
-            httpStatus: originalError.httpStatus,
-            meta: originalError.meta,
-          },
-        };
-      }
-
       return formattedError;
     },
   });

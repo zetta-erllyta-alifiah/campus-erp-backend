@@ -13,6 +13,9 @@ const {
   DeleteTest,
 } = require('./curriculum.helper');
 
+// *************** IMPORT UTILITIES ***************
+const { LogAndNormalizeGqlError } = require('../../../core/errors');
+
 // *************** MUTATION ***************
 
 /**
@@ -22,7 +25,11 @@ const {
  * @returns {Promise<Object>}
  */
 async function CreateBlockMutation(_, { input }) {
-  return CreateBlock(input);
+  try {
+    return await CreateBlock(input);
+  } catch (error) {
+    throw await LogAndNormalizeGqlError(error, { source: 'CreateBlockMutation' });
+  }
 }
 
 /**
@@ -32,7 +39,11 @@ async function CreateBlockMutation(_, { input }) {
  * @returns {Promise<Object>}
  */
 async function UpdateBlockMutation(_, { block_id, input }) {
-  return UpdateBlock(block_id, input);
+  try {
+    return await UpdateBlock(block_id, input);
+  } catch (error) {
+    throw await LogAndNormalizeGqlError(error, { source: 'UpdateBlockMutation' });
+  }
 }
 
 /**
@@ -42,7 +53,11 @@ async function UpdateBlockMutation(_, { block_id, input }) {
  * @returns {Promise<Boolean>}
  */
 async function DeleteBlockMutation(_, { block_id }) {
-  return DeleteBlock(block_id);
+  try {
+    return await DeleteBlock(block_id);
+  } catch (error) {
+    throw await LogAndNormalizeGqlError(error, { source: 'DeleteBlockMutation' });
+  }
 }
 
 /**
@@ -52,7 +67,11 @@ async function DeleteBlockMutation(_, { block_id }) {
  * @returns {Promise<Object>}
  */
 async function CreateSubjectMutation(_, { input }) {
-  return CreateSubject(input);
+  try {
+    return await CreateSubject(input);
+  } catch (error) {
+    throw await LogAndNormalizeGqlError(error, { source: 'CreateSubjectMutation' });
+  }
 }
 
 /**
@@ -62,7 +81,11 @@ async function CreateSubjectMutation(_, { input }) {
  * @returns {Promise<Object>}
  */
 async function UpdateSubjectMutation(_, { subject_id, input }) {
-  return UpdateSubject(subject_id, input);
+  try {
+    return await UpdateSubject(subject_id, input);
+  } catch (error) {
+    throw await LogAndNormalizeGqlError(error, { source: 'UpdateSubjectMutation' });
+  }
 }
 
 /**
@@ -72,7 +95,11 @@ async function UpdateSubjectMutation(_, { subject_id, input }) {
  * @returns {Promise<Boolean>}
  */
 async function DeleteSubjectMutation(_, { subject_id }) {
-  return DeleteSubject(subject_id);
+  try {
+    return await DeleteSubject(subject_id);
+  } catch (error) {
+    throw await LogAndNormalizeGqlError(error, { source: 'DeleteSubjectMutation' });
+  }
 }
 
 /**
@@ -82,7 +109,11 @@ async function DeleteSubjectMutation(_, { subject_id }) {
  * @returns {Promise<Object>}
  */
 async function CreateTestMutation(_, { input }) {
-  return CreateTest(input);
+  try {
+    return await CreateTest(input);
+  } catch (error) {
+    throw await LogAndNormalizeGqlError(error, { source: 'CreateTestMutation' });
+  }
 }
 
 /**
@@ -92,7 +123,11 @@ async function CreateTestMutation(_, { input }) {
  * @returns {Promise<Object>}
  */
 async function UpdateTestMutation(_, { test_id, input }) {
-  return UpdateTest(test_id, input);
+  try {
+    return await UpdateTest(test_id, input);
+  } catch (error) {
+    throw await LogAndNormalizeGqlError(error, { source: 'UpdateTestMutation' });
+  }
 }
 
 /**
@@ -102,7 +137,11 @@ async function UpdateTestMutation(_, { test_id, input }) {
  * @returns {Promise<Boolean>}
  */
 async function DeleteTestMutation(_, { test_id }) {
-  return DeleteTest(test_id);
+  try {
+    return await DeleteTest(test_id);
+  } catch (error) {
+    throw await LogAndNormalizeGqlError(error, { source: 'DeleteTestMutation' });
+  }
 }
 
 // *************** EXPORT MODULE ***************

@@ -100,14 +100,14 @@ const typeDefs = gql`
 
   type Mutation {
     CreateBlock(input: CreateBlockInput!): Block! @auth(requires: ADMIN)
-    UpdateBlock(block_id: ID!, input: UpdateBlockInput!): Block!
-    DeleteBlock(block_id: ID!): Boolean!
-    CreateSubject(input: CreateSubjectInput!): Subject! @auth(requires: ADMIN)
-    UpdateSubject(subject_id: ID!, input: UpdateSubjectInput!): Subject!
-    DeleteSubject(subject_id: ID!): Boolean!
-    CreateTest(input: CreateTestInput!): Test! @auth(requires: ADMIN)
-    UpdateTest(test_id: ID!, input: UpdateTestInput!): Test!
-    DeleteTest(test_id: ID!): Boolean!
+    UpdateBlock(block_id: ID!, input: UpdateBlockInput!): Block! @auth(requires: ADMIN)
+    DeleteBlock(block_id: ID!): Boolean! @auth(requires: ADMIN)
+    CreateSubject(input: CreateSubjectInput!): Subject! @auth(requires: TEACHER)
+    UpdateSubject(subject_id: ID!, input: UpdateSubjectInput!): Subject! @auth(requires: TEACHER)
+    DeleteSubject(subject_id: ID!): Boolean! @auth(requires: TEACHER)
+    CreateTest(input: CreateTestInput!): Test! @auth(requires: TEACHER)
+    UpdateTest(test_id: ID!, input: UpdateTestInput!): Test! @auth(requires: TEACHER)
+    DeleteTest(test_id: ID!): Boolean! @auth(requires: TEACHER)
   }
 `;
 

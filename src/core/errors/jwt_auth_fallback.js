@@ -1,5 +1,5 @@
-// *************** IMPORT MODULE ***************
-const { AppError } = require('./app_error');
+// *************** IMPORT LIBRARY ***************
+const { GraphQLError } = require('graphql');
 
 // *************** GLOBAL VARIABLES ***************
 const JWT_AUTH_FALLBACK_REASONS = {
@@ -17,14 +17,20 @@ const JWT_AUTH_FALLBACK_REASONS = {
  * field-level authorization is enforced by the GraphQL auth directive.
  *
  * @param {Error} error - JWT verification error.
- * @returns {AppError} Structured auth fallback error.
+ * @returns {GraphQLError} Structured auth fallback error.
  */
 function NormalizeJwtAuthFallback(error) {
   const errorName = error?.name || 'UnknownJwtError';
   const fallbackReason = JWT_AUTH_FALLBACK_REASONS[errorName] || 'JWT_VERIFICATION_FAILED';
 
-  return new AppError(fallbackReason, 401, 'JWT verification failed; request continued as anonymous.', {
-    reason: errorName,
+  return new GraphQLError('JWT verification failed.', {
+    extensions: {
+      code: fallbackReason,
+      httpStatus: 401,
+      meta: {
+        reason: errorName,
+      },
+    },
   });
 }
 

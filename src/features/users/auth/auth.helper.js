@@ -1,14 +1,13 @@
 // *************** IMPORT LIBRARY ***************
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { GraphQLError } = require('graphql');
 
 // *************** IMPORT MODULE ***************
-const { AppError } = require('../../../core/errors');
 const { UserModel } = require('../user/user.model');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
-
 const { LoginValidator } = require('./auth.validator');
 
 // *************** MUTATION ***************
@@ -18,7 +17,7 @@ const { LoginValidator } = require('./auth.validator');
  *
  * @param {Object} input - Login credentials.
  * @returns {Promise<string>} Signed JWT token.
- * @throws {AppError} 401 - Invalid email or password.
+ * @throws {GraphQLError} 401 - Invalid email or password.
  */
 async function LoginHelper(input) {
   // *************** Validate and sanitize login payload before authentication
@@ -32,7 +31,13 @@ async function LoginHelper(input) {
 
   // *************** Return a generic auth error to avoid exposing which credential failed
   if (!user) {
-    throw new AppError('UNAUTHORIZED', 401, 'Invalid email or password');
+    throw new GraphQLError('Invalid email or password', {
+      extensions: {
+        code: 'UNAUTHORIZED',
+        httpStatus: 401,
+        meta: null,
+      },
+    });
   }
 
   // *************** Compare the submitted password against the stored password hash
@@ -40,7 +45,13 @@ async function LoginHelper(input) {
 
   // *************** Keep the same generic auth error for invalid password attempts
   if (!isPasswordValid) {
-    throw new AppError('UNAUTHORIZED', 401, 'Invalid email or password');
+    throw new GraphQLError('Invalid email or password', {
+      extensions: {
+        code: 'UNAUTHORIZED',
+        httpStatus: 401,
+        meta: null,
+      },
+    });
   }
 
   // *************** Sign the access token with identity and role claims for authorization

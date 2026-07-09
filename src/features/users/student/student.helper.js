@@ -1,9 +1,9 @@
 // *************** IMPORT LIBRARY ***************
 const mongoose = require('mongoose');
+const { GraphQLError } = require('graphql');
 
 // *************** IMPORT MODULE ***************
 const { StudentModel } = require('./student.model');
-const { AppError } = require('../../../core/errors');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -32,7 +32,7 @@ function EscapeRegex(value) {
  * - Student number must be unique.
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {AppError}
+ * @throws {GraphQLError}
  */
 async function CreateStudentHelper(input) {
   // *************** Validate and sanitize student payload before uniqueness checks
@@ -44,7 +44,13 @@ async function CreateStudentHelper(input) {
   });
 
   if (existingEmail) {
-    throw new AppError('EMAIL_ALREADY_EXISTS', 400, 'Email already exists');
+    throw new GraphQLError('Email already exists', {
+      extensions: {
+        code: 'EMAIL_ALREADY_EXISTS',
+        httpStatus: 400,
+        meta: null,
+      },
+    });
   }
 
   // *************** Validate unique student number ***************
@@ -53,7 +59,13 @@ async function CreateStudentHelper(input) {
   });
 
   if (existingStudentNumber) {
-    throw new AppError('STUDENT_NUMBER_ALREADY_EXISTS', 400, 'Student number already exists');
+    throw new GraphQLError('Student number already exists', {
+      extensions: {
+        code: 'STUDENT_NUMBER_ALREADY_EXISTS',
+        httpStatus: 400,
+        meta: null,
+      },
+    });
   }
 
   return StudentModel.create(validatedInput);

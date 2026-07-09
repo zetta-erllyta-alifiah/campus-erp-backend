@@ -1,20 +1,8 @@
 // *************** IMPORT LIBRARY ***************
 const Joi = require('joi');
-const mongoose = require('mongoose');
 
-// *************** GLOBAL VARIABLES ***************
-
-/**
- * Custom validator for MongoDB
- * ObjectId values.
- */
-const ObjectIdValidator = Joi.string().custom((value, helpers) => {
-  if (!mongoose.Types.ObjectId.isValid(value)) {
-    return helpers.error('any.invalid');
-  }
-
-  return value;
-}, 'ObjectId validation');
+// *************** IMPORT VALIDATOR ***************
+const { ObjectIdValidator } = require('../../../shared/validators/validator');
 
 // *************** VALIDATION SCHEMA ***************
 /**

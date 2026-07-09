@@ -2,7 +2,7 @@
 const { LoginHelper } = require('./auth.helper');
 
 // *************** IMPORT UTILITIES ***************
-const { NormalizeGqlError } = require('../../../core/errors');
+const { LogAndNormalizeGqlError } = require('../../../core/errors');
 
 // *************** MUTATION ***************
 
@@ -19,7 +19,7 @@ async function LoginMutation(_, args) {
 
     return await LoginHelper(input);
   } catch (error) {
-    throw NormalizeGqlError(error);
+    throw await LogAndNormalizeGqlError(error, { source: 'LoginMutation' });
   }
 }
 

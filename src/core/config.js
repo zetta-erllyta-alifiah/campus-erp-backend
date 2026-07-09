@@ -1,26 +1,42 @@
 // *************** IMPORT LIBRARY ***************
 require('dotenv').config();
-
-// *************** IMPORT MODULE ***************
-const { AppError } = require('./errors/');
+const { GraphQLError } = require('graphql');
 
 // *************** IMPORT HELPER FUNCTION ***************
 /**
  * Validates required environment variables.
- * @throws {AppError} CONFIG_MONGO_URI_REQUIRED
- * @throws {AppError} CONFIG_PORT_REQUIRED
+ * @throws {GraphQLError} CONFIG_MONGO_URI_REQUIRED
+ * @throws {GraphQLError} CONFIG_PORT_REQUIRED
  */
 function validateEnvironmentVariables() {
   if (!process.env.MONGO_URI) {
-    throw new AppError('CONFIG_MONGO_URI_REQUIRED', 500, 'MONGO_URI is not defined.');
+    throw new GraphQLError('MONGO_URI is not defined.', {
+      extensions: {
+        code: 'CONFIG_MONGO_URI_REQUIRED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
   }
 
   if (!process.env.PORT) {
-    throw new AppError('CONFIG_PORT_REQUIRED', 500, 'PORT is not defined.');
+    throw new GraphQLError('PORT is not defined.', {
+      extensions: {
+        code: 'CONFIG_PORT_REQUIRED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
   }
 
   if (!process.env.JWT_SECRET) {
-    throw new AppError('CONFIG_JWT_SECRET_REQUIRED', 500, 'JWT_SECRET is not defined.');
+    throw new GraphQLError('JWT_SECRET is not defined.', {
+      extensions: {
+        code: 'CONFIG_JWT_SECRET_REQUIRED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
   }
 }
 

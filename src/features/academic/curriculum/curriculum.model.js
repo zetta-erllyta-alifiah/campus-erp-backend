@@ -149,66 +149,13 @@ const TestSchema = new mongoose.Schema(
   },
 );
 
-/**
- * Student grade schema used
- * for relational locking.
- *
- * This collection stores submitted scores
- * so curriculum entities can be protected
- * from updates or deletions after grading.
- */
-const StudentGradeSchema = new mongoose.Schema(
-  {
-    // Student who owns the submitted grade record
-    student_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-    },
-
-    // Curriculum block context used to lock block changes after grading
-    block_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Block',
-      required: true,
-    },
-
-    // Subject context used to lock subject changes after grading
-    subject_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Subject',
-      required: true,
-    },
-
-    // Test context used to lock test changes after grading
-    test_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Test',
-      required: true,
-    },
-
-    // Numeric score submitted for the student test attempt
-    score: {
-      type: Number,
-    },
-  },
-  {
-    timestamps: {
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
-    },
-    collection: 'student_grades',
-  },
-);
-
 const BlockModel = mongoose.model('Block', BlockSchema);
 const SubjectModel = mongoose.model('Subject', SubjectSchema);
 const TestModel = mongoose.model('Test', TestSchema);
-const StudentGradeModel = mongoose.model('StudentGrade', StudentGradeSchema);
 
 // *************** EXPORT MODULE ***************
 module.exports = {
   BlockModel,
   SubjectModel,
   TestModel,
-  StudentGradeModel,
 };
