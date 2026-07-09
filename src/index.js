@@ -11,6 +11,7 @@ const applicationConfig = require('./core/config');
 const { ConnectDatabase } = require('./core/db');
 const systemGraphQLModule = require('./features/system');
 const { CreateAcademicYearLoader } = require('./loaders/academic_year.loader');
+const { InitializeGradeAuditorJob } = require('./jobs/missing_grades.job');
 
 const curriculumModule = require('./features/academic/curriculum');
 const studentModule = require('./features/users/student');
@@ -67,6 +68,9 @@ async function InitializeApplication() {
   try {
     // *************** Initialize database connection ***************
     await ConnectDatabase();
+
+    // *************** Initialize background jobs after database is ready ***************
+    await InitializeGradeAuditorJob();
 
     // *************** Configure Express application ***************
     const expressApplication = express();
