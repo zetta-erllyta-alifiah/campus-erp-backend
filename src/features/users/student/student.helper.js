@@ -1,8 +1,8 @@
 // *************** IMPORT LIBRARY ***************
 const mongoose = require('mongoose');
-const { GraphQLError } = require('graphql');
 
 // *************** IMPORT MODULE ***************
+const { AppError } = require('../../../core/errors');
 const { StudentModel } = require('./student.model');
 
 // *************** IMPORT VALIDATOR ***************
@@ -32,7 +32,7 @@ function EscapeRegex(value) {
  * - Student number must be unique.
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function CreateStudentHelper(input) {
   // *************** Validate and sanitize student payload before uniqueness checks
@@ -44,13 +44,7 @@ async function CreateStudentHelper(input) {
   });
 
   if (existingEmail) {
-    throw new GraphQLError('Email already exists', {
-      extensions: {
-        code: 'EMAIL_ALREADY_EXISTS',
-        httpStatus: 400,
-        meta: null,
-      },
-    });
+    throw new AppError('EMAIL_ALREADY_EXISTS', 400, 'Email already exists');
   }
 
   // *************** Validate unique student number ***************
@@ -59,13 +53,7 @@ async function CreateStudentHelper(input) {
   });
 
   if (existingStudentNumber) {
-    throw new GraphQLError('Student number already exists', {
-      extensions: {
-        code: 'STUDENT_NUMBER_ALREADY_EXISTS',
-        httpStatus: 400,
-        meta: null,
-      },
-    });
+    throw new AppError('STUDENT_NUMBER_ALREADY_EXISTS', 400, 'Student number already exists');
   }
 
   return StudentModel.create(validatedInput);
@@ -192,3 +180,4 @@ module.exports = {
   CreateStudentHelper,
   GetStudentsByAcademicYearHelper,
 };
+

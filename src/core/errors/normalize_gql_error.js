@@ -2,6 +2,7 @@
 const { GraphQLError } = require('graphql');
 
 // *************** IMPORT MODULE ***************
+const { AppError } = require('./app_error');
 const { ErrorLogModel } = require('./error_log.model');
 
 /**
@@ -13,6 +14,16 @@ const { ErrorLogModel } = require('./error_log.model');
 function NormalizeGqlError(error) {
   if (error instanceof GraphQLError) {
     return error;
+  }
+
+  if (error instanceof AppError || error?.isOperational) {
+    return new GraphQLError(error.message, {
+      extensions: {
+        code: error.code,
+        httpStatus: error.httpStatus,
+        meta: error.meta || null,
+      },
+    });
   }
 
   if (error?.code === 11000) {
