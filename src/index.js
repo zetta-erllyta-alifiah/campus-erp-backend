@@ -11,7 +11,7 @@ const applicationConfig = require('./core/config');
 const { ConnectDatabase } = require('./core/db');
 const systemGraphQLModule = require('./features/system');
 const { CreateAcademicYearLoader } = require('./loaders/academic_year.loader');
-const { InitializeGradeAuditorJob } = require('./jobs/missing_grades.job');
+const { InitializeGradeAuditorJob } = require('./jobs/system/missing_grade_auditor.cron');
 
 const curriculumModule = require('./features/academic/curriculum');
 const studentModule = require('./features/users/student');
