@@ -46,11 +46,11 @@ const BlockSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Academic year
-    academic_year: {
-      type: String,
+    // Academic year reference that owns this curriculum block.
+    academic_year_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AcademicYear',
       required: true,
-      trim: true,
     },
 
     // Grading rules

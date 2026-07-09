@@ -18,6 +18,7 @@
 const { AppError } = require('../../../core/errors');
 const { BlockModel, SubjectModel, TestModel } = require('./curriculum.model');
 const { StudentGradeModel } = require('../grading/student_grade.model');
+const { AcademicYearModel } = require('../enrollment/academic_year.model');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -132,6 +133,63 @@ async function ValidateGradeLock(entityType, entityId) {
   }
 }
 
+/**
+ * Finds an academic year by identifier.
+ *
+ * @param {string} academicYearId - Academic year identifier stored on the block.
+ * @returns {Promise<Object>} Matching academic year document.
+ * @throws {AppError}
+ */
+async function FindAcademicYearById(academicYearId) {
+  const academicYear = await AcademicYearModel.findById(academicYearId);
+
+  if (!academicYear) {
+    throw new AppError('ACADEMIC_YEAR_NOT_FOUND', 404, 'Academic year not found');
+  }
+
+  return academicYear;
+}
+
+/**
+ * Adds a block reference to the matching academic year.
+ *
+ * @param {string} academicYearId - Academic year identifier stored on the block.
+ * @param {Object} blockId - Block identifier to attach.
+ * @returns {Promise<void>}
+ */
+async function AddBlockToAcademicYear(academicYearId, blockId) {
+  await AcademicYearModel.updateOne(
+    {
+      _id: academicYearId,
+    },
+    {
+      $addToSet: {
+        block_ids: blockId,
+      },
+    },
+  );
+}
+
+/**
+ * Removes a block reference from the matching academic year.
+ *
+ * @param {string} academicYearId - Academic year identifier stored on the block.
+ * @param {Object} blockId - Block identifier to detach.
+ * @returns {Promise<void>}
+ */
+async function RemoveBlockFromAcademicYear(academicYearId, blockId) {
+  await AcademicYearModel.updateOne(
+    {
+      _id: academicYearId,
+    },
+    {
+      $pull: {
+        block_ids: blockId,
+      },
+    },
+  );
+}
+
 // *************** BLOCK BUSINESS LOGIC ***************
 
 /**
@@ -143,7 +201,16 @@ async function CreateBlock(input) {
   // *************** Validate and sanitize block payload before persistence
   const validatedInput = ValidateInputWithJoi(CreateBlockValidator, input);
 
-  return BlockModel.create(validatedInput);
+  // *************** Ensure the block points to an existing academic year
+  await FindAcademicYearById(validatedInput.academic_year_id);
+
+  // *************** Persist block before attaching its id to the academic year
+  const createdBlock = await BlockModel.create(validatedInput);
+
+  // *************** Maintain AcademicYear.block_ids for missing-grade cron lookup
+  await AddBlockToAcademicYear(createdBlock.academic_year_id, createdBlock._id);
+
+  return createdBlock;
 }
 
 /**
@@ -174,10 +241,26 @@ async function UpdateBlock(blockId, input) {
   // *************** Protect blocks that already have submitted student grades
   await ValidateGradeLock('BLOCK', validatedId.block_id);
 
-  return BlockModel.findByIdAndUpdate(validatedId.block_id, validatedInput, {
+  if (validatedInput.academic_year_id !== undefined) {
+    // *************** Ensure the new academic year exists before moving the block reference
+    await FindAcademicYearById(validatedInput.academic_year_id);
+  }
+
+  const updatedBlock = await BlockModel.findByIdAndUpdate(validatedId.block_id, validatedInput, {
     new: true,
     runValidators: true,
   });
+
+  if (
+    validatedInput.academic_year_id !== undefined &&
+    String(validatedInput.academic_year_id) !== String(existingBlock.academic_year_id)
+  ) {
+    // *************** Keep AcademicYear.block_ids in sync when a block changes academic year
+    await RemoveBlockFromAcademicYear(existingBlock.academic_year_id, existingBlock._id);
+    await AddBlockToAcademicYear(updatedBlock.academic_year_id, updatedBlock._id);
+  }
+
+  return updatedBlock;
 }
 
 /**
@@ -217,6 +300,9 @@ async function DeleteBlock(blockId) {
   await ValidateGradeLock('BLOCK', validatedId.block_id);
 
   await BlockModel.findByIdAndDelete(validatedId.block_id);
+
+  // *************** Remove stale block reference from its academic year after deletion
+  await RemoveBlockFromAcademicYear(existingBlock.academic_year_id, existingBlock._id);
 
   return true;
 }
