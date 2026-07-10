@@ -14,12 +14,11 @@
  * - Hierarchical deletion protection
  */
 
-// *************** IMPORT LIBRARY ***************
-const { GraphQLError } = require('graphql');
-
 // *************** IMPORT MODULE ***************
+const { AppError } = require('../../../core/errors');
 const { BlockModel, SubjectModel, TestModel } = require('./curriculum.model');
 const { StudentGradeModel } = require('../grading/student_grade.model');
+const { AcademicYearModel } = require('../enrollment/academic_year.model');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -52,7 +51,7 @@ const {
  * @param {number} currentWeightage
  * @param {number} incomingWeightage
  * @returns {void}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
   // *************** Normalize decimal precision before enforcing the 100% limit
@@ -60,13 +59,7 @@ function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
 
   // *************** Reject sibling totals that would exceed the curriculum weightage cap
   if (totalWeightage > 100) {
-    throw new GraphQLError('Total weightage exceeds 100%', {
-      extensions: {
-        code: 'WEIGHTAGE_LIMIT_EXCEEDED',
-        httpStatus: 400,
-        meta: null,
-      },
-    });
+    throw new AppError('WEIGHTAGE_LIMIT_EXCEEDED', 400, 'Total weightage exceeds 100%');
   }
 }
 
@@ -81,7 +74,7 @@ function ValidateWeightageLimit(currentWeightage, incomingWeightage) {
  * @param {string} entityType
  * @param {string} entityId
  * @returns {Promise<void>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function ValidateGradeLock(entityType, entityId) {
   let lockedTestIds = [];
@@ -136,14 +129,65 @@ async function ValidateGradeLock(entityType, entityId) {
 
   // *************** Prevent structural changes once grade data exists
   if (existingGrade) {
-    throw new GraphQLError('Entity locked', {
-      extensions: {
-        code: 'ENTITY_LOCKED_GRADES_EXIST',
-        httpStatus: 409,
-        meta: null,
-      },
-    });
+    throw new AppError('ENTITY_LOCKED_GRADES_EXIST', 409, 'Entity locked');
   }
+}
+
+/**
+ * Finds an academic year by identifier.
+ *
+ * @param {string} academicYearId - Academic year identifier stored on the block.
+ * @returns {Promise<Object>} Matching academic year document.
+ * @throws {AppError}
+ */
+async function FindAcademicYearById(academicYearId) {
+  const academicYear = await AcademicYearModel.findById(academicYearId);
+
+  if (!academicYear) {
+    throw new AppError('ACADEMIC_YEAR_NOT_FOUND', 404, 'Academic year not found');
+  }
+
+  return academicYear;
+}
+
+/**
+ * Adds a block reference to the matching academic year.
+ *
+ * @param {string} academicYearId - Academic year identifier stored on the block.
+ * @param {Object} blockId - Block identifier to attach.
+ * @returns {Promise<void>}
+ */
+async function AddBlockToAcademicYear(academicYearId, blockId) {
+  await AcademicYearModel.updateOne(
+    {
+      _id: academicYearId,
+    },
+    {
+      $addToSet: {
+        block_ids: blockId,
+      },
+    },
+  );
+}
+
+/**
+ * Removes a block reference from the matching academic year.
+ *
+ * @param {string} academicYearId - Academic year identifier stored on the block.
+ * @param {Object} blockId - Block identifier to detach.
+ * @returns {Promise<void>}
+ */
+async function RemoveBlockFromAcademicYear(academicYearId, blockId) {
+  await AcademicYearModel.updateOne(
+    {
+      _id: academicYearId,
+    },
+    {
+      $pull: {
+        block_ids: blockId,
+      },
+    },
+  );
 }
 
 // *************** BLOCK BUSINESS LOGIC ***************
@@ -157,7 +201,16 @@ async function CreateBlock(input) {
   // *************** Validate and sanitize block payload before persistence
   const validatedInput = ValidateInputWithJoi(CreateBlockValidator, input);
 
-  return BlockModel.create(validatedInput);
+  // *************** Ensure the block points to an existing academic year
+  await FindAcademicYearById(validatedInput.academic_year_id);
+
+  // *************** Persist block before attaching its id to the academic year
+  const createdBlock = await BlockModel.create(validatedInput);
+
+  // *************** Maintain AcademicYear.block_ids for missing-grade cron lookup
+  await AddBlockToAcademicYear(createdBlock.academic_year_id, createdBlock._id);
+
+  return createdBlock;
 }
 
 /**
@@ -171,7 +224,7 @@ async function CreateBlock(input) {
  * @param {string} blockId
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function UpdateBlock(blockId, input) {
   // *************** Validate and sanitize block id and payload before business rules
@@ -182,22 +235,32 @@ async function UpdateBlock(blockId, input) {
   const existingBlock = await BlockModel.findById(validatedId.block_id);
 
   if (!existingBlock) {
-    throw new GraphQLError('Block not found', {
-      extensions: {
-        code: 'BLOCK_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
   // *************** Protect blocks that already have submitted student grades
   await ValidateGradeLock('BLOCK', validatedId.block_id);
 
-  return BlockModel.findByIdAndUpdate(validatedId.block_id, validatedInput, {
+  if (validatedInput.academic_year_id !== undefined) {
+    // *************** Ensure the new academic year exists before moving the block reference
+    await FindAcademicYearById(validatedInput.academic_year_id);
+  }
+
+  const updatedBlock = await BlockModel.findByIdAndUpdate(validatedId.block_id, validatedInput, {
     new: true,
     runValidators: true,
   });
+
+  if (
+    validatedInput.academic_year_id !== undefined &&
+    String(validatedInput.academic_year_id) !== String(existingBlock.academic_year_id)
+  ) {
+    // *************** Keep AcademicYear.block_ids in sync when a block changes academic year
+    await RemoveBlockFromAcademicYear(existingBlock.academic_year_id, existingBlock._id);
+    await AddBlockToAcademicYear(updatedBlock.academic_year_id, updatedBlock._id);
+  }
+
+  return updatedBlock;
 }
 
 /**
@@ -211,7 +274,7 @@ async function UpdateBlock(blockId, input) {
  *   if grades already exist.
  * @param {string} blockId
  * @returns {Promise<boolean>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function DeleteBlock(blockId) {
   // *************** Validate block id before dependency checks
@@ -221,13 +284,7 @@ async function DeleteBlock(blockId) {
   const existingBlock = await BlockModel.findById(validatedId.block_id);
 
   if (!existingBlock) {
-    throw new GraphQLError('Block not found', {
-      extensions: {
-        code: 'BLOCK_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
   // *************** Prevent deleting a block that still owns subjects
@@ -236,19 +293,16 @@ async function DeleteBlock(blockId) {
   });
 
   if (existingSubjects) {
-    throw new GraphQLError('Block still contains subjects', {
-      extensions: {
-        code: 'BLOCK_HAS_SUBJECTS',
-        httpStatus: 409,
-        meta: null,
-      },
-    });
+    throw new AppError('BLOCK_HAS_SUBJECTS', 409, 'Block still contains subjects');
   }
 
   // *************** Protect blocks that already have submitted student grades
   await ValidateGradeLock('BLOCK', validatedId.block_id);
 
   await BlockModel.findByIdAndDelete(validatedId.block_id);
+
+  // *************** Remove stale block reference from its academic year after deletion
+  await RemoveBlockFromAcademicYear(existingBlock.academic_year_id, existingBlock._id);
 
   return true;
 }
@@ -266,7 +320,7 @@ async function DeleteBlock(blockId) {
  *   cannot exceed 100%.
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function CreateSubject(input) {
   // *************** Validate and sanitize subject payload before business rules
@@ -276,13 +330,7 @@ async function CreateSubject(input) {
   const existingBlock = await BlockModel.findById(validatedInput.block_id);
 
   if (!existingBlock) {
-    throw new GraphQLError('Block not found', {
-      extensions: {
-        code: 'BLOCK_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
   // *************** Sum existing subject weightage inside the same block
@@ -323,7 +371,7 @@ async function CreateSubject(input) {
  * @param {string} subjectId
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function UpdateSubject(subjectId, input) {
   // *************** Validate and sanitize subject id and payload before business rules
@@ -334,13 +382,7 @@ async function UpdateSubject(subjectId, input) {
   const existingSubject = await SubjectModel.findById(validatedId.subject_id);
 
   if (!existingSubject) {
-    throw new GraphQLError('Subject not found', {
-      extensions: {
-        code: 'SUBJECT_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
   // *************** Protect subjects that already have submitted student grades
@@ -390,7 +432,7 @@ async function UpdateSubject(subjectId, input) {
  *   if grades already exist.
  * @param {string} subjectId
  * @returns {Promise<boolean>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function DeleteSubject(subjectId) {
   // *************** Validate subject id before dependency checks
@@ -400,13 +442,7 @@ async function DeleteSubject(subjectId) {
   const existingSubject = await SubjectModel.findById(validatedId.subject_id);
 
   if (!existingSubject) {
-    throw new GraphQLError('Subject not found', {
-      extensions: {
-        code: 'SUBJECT_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
   // *************** Prevent deleting a subject that still owns tests
@@ -415,13 +451,7 @@ async function DeleteSubject(subjectId) {
   });
 
   if (existingTests) {
-    throw new GraphQLError('Subject still contains tests', {
-      extensions: {
-        code: 'SUBJECT_HAS_TESTS',
-        httpStatus: 409,
-        meta: null,
-      },
-    });
+    throw new AppError('SUBJECT_HAS_TESTS', 409, 'Subject still contains tests');
   }
 
   // *************** Protect subjects that already have submitted student grades
@@ -444,7 +474,7 @@ async function DeleteSubject(subjectId) {
  *   cannot exceed 100%.
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function CreateTest(input) {
   // *************** Validate and sanitize test payload before business rules
@@ -454,13 +484,7 @@ async function CreateTest(input) {
   const existingSubject = await SubjectModel.findById(validatedInput.subject_id);
 
   if (!existingSubject) {
-    throw new GraphQLError('Subject not found', {
-      extensions: {
-        code: 'SUBJECT_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
   // *************** Load sibling tests to calculate the current subject test total
@@ -490,7 +514,7 @@ async function CreateTest(input) {
  * @param {string} testId
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function UpdateTest(testId, input) {
   // *************** Validate and sanitize test id and payload before business rules
@@ -501,13 +525,7 @@ async function UpdateTest(testId, input) {
   const existingTest = await TestModel.findById(validatedId.test_id);
 
   if (!existingTest) {
-    throw new GraphQLError('Test not found', {
-      extensions: {
-        code: 'TEST_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('TEST_NOT_FOUND', 404, 'Test not found');
   }
 
   // *************** Protect tests that already have submitted student grades
@@ -555,7 +573,7 @@ async function UpdateTest(testId, input) {
  *   if grades already exist.
  * @param {string} testId
  * @returns {Promise<boolean>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function DeleteTest(testId) {
   // *************** Validate test id before lock checks
@@ -565,13 +583,7 @@ async function DeleteTest(testId) {
   const existingTest = await TestModel.findById(validatedId.test_id);
 
   if (!existingTest) {
-    throw new GraphQLError('Test not found', {
-      extensions: {
-        code: 'TEST_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('TEST_NOT_FOUND', 404, 'Test not found');
   }
 
   // *************** Protect tests that already have submitted student grades
@@ -596,4 +608,5 @@ module.exports = {
   UpdateTest,
   DeleteTest,
 };
+
 

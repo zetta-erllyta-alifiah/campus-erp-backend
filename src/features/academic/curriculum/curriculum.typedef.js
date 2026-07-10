@@ -26,7 +26,7 @@ const typeDefs = gql`
   type Block {
     _id: ID!
     name: String!
-    academic_year: String!
+    academic_year_id: ID!
     grading_rules: [GradingRule!]!
     created_at: String!
     updated_at: String!
@@ -62,13 +62,13 @@ const typeDefs = gql`
 
   input CreateBlockInput {
     name: String!
-    academic_year: String!
+    academic_year_id: ID!
     grading_rules: [GradingRuleInput!]
   }
 
   input UpdateBlockInput {
     name: String
-    academic_year: String
+    academic_year_id: ID
     grading_rules: [GradingRuleInput!]
   }
 

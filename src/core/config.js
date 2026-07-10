@@ -38,6 +38,46 @@ function validateEnvironmentVariables() {
       },
     });
   }
+
+  if (!process.env.SMTP_HOST) {
+    throw new GraphQLError('SMTP_HOST is not defined.', {
+      extensions: {
+        code: 'CONFIG_SMTP_HOST_REQUIRED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
+  }
+
+  if (!process.env.SMTP_PORT) {
+    throw new GraphQLError('SMTP_PORT is not defined.', {
+      extensions: {
+        code: 'CONFIG_SMTP_PORT_REQUIRED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
+  }
+
+  if (!process.env.SMTP_USER) {
+    throw new GraphQLError('SMTP_USER is not defined.', {
+      extensions: {
+        code: 'CONFIG_SMTP_USER_REQUIRED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
+  }
+
+  if (!process.env.SMTP_PASS) {
+    throw new GraphQLError('SMTP_PASS is not defined.', {
+      extensions: {
+        code: 'CONFIG_SMTP_PASS_REQUIRED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
+  }
 }
 
 // *************** GLOBAL VARIABLES ***************
@@ -48,6 +88,12 @@ const applicationConfig = {
   env: process.env.NODE_ENV,
   db: {
     uri: process.env.MONGO_URI,
+  },
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT),
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
 };
 

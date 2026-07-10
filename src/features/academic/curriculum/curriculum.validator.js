@@ -41,7 +41,7 @@ const gradingRuleValidator = Joi.object({
  */
 const CreateBlockValidator = Joi.object({
   name: Joi.string().trim().required(),
-  academic_year: Joi.string().trim().required(),
+  academic_year_id: ObjectIdValidator.required(),
   grading_rules: Joi.array().items(gradingRuleValidator).default([]),
 });
 
@@ -53,7 +53,7 @@ const CreateBlockValidator = Joi.object({
  */
 const UpdateBlockValidator = Joi.object({
   name: Joi.string().trim(),
-  academic_year: Joi.string().trim(),
+  academic_year_id: ObjectIdValidator,
   grading_rules: Joi.array().items(gradingRuleValidator),
 }).min(1);
 

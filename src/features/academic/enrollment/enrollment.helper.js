@@ -1,7 +1,5 @@
-// *************** IMPORT LIBRARY ***************
-const { GraphQLError } = require('graphql');
-
 // *************** IMPORT MODULE ***************
+const { AppError } = require('../../../core/errors');
 const { AcademicYearModel } = require('./academic_year.model');
 const { StudentModel } = require('../../users/student/student.model');
 
@@ -25,7 +23,7 @@ const { CreateEnrollmentValidator } = require('./enrollment.validator');
  *   performed bi-directionally.
  * @param {Object} input
  * @returns {Promise<Object>}
- * @throws {GraphQLError}
+ * @throws {AppError}
  */
 async function EnrollStudentsHelper(input) {
   // *************** Validate and sanitize enrollment payload before business rules
@@ -35,23 +33,11 @@ async function EnrollStudentsHelper(input) {
   const academicYear = await AcademicYearModel.findById(validatedInput.academic_year_id);
 
   if (!academicYear) {
-    throw new GraphQLError('Academic year not found', {
-      extensions: {
-        code: 'ACADEMIC_YEAR_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('ACADEMIC_YEAR_NOT_FOUND', 404, 'Academic year not found');
   }
 
   if (academicYear.status !== 'active') {
-    throw new GraphQLError('Academic year is closed', {
-      extensions: {
-        code: 'ACADEMIC_YEAR_CLOSED',
-        httpStatus: 400,
-        meta: null,
-      },
-    });
+    throw new AppError('ACADEMIC_YEAR_CLOSED', 400, 'Academic year is closed');
   }
 
   // *************** Remove duplicate student IDs ***************
@@ -65,13 +51,7 @@ async function EnrollStudentsHelper(input) {
   });
 
   if (studentCount !== uniqueStudentIds.length) {
-    throw new GraphQLError('Invalid student reference', {
-      extensions: {
-        code: 'INVALID_STUDENT_REFERENCE',
-        httpStatus: 400,
-        meta: null,
-      },
-    });
+    throw new AppError('INVALID_STUDENT_REFERENCE', 400, 'Invalid student reference');
   }
 
   // *************** Update academic year enrollment ***************
@@ -110,3 +90,4 @@ async function EnrollStudentsHelper(input) {
 module.exports = {
   EnrollStudentsHelper,
 };
+

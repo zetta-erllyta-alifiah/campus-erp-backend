@@ -1,7 +1,5 @@
-// *************** IMPORT LIBRARY ***************
-const { GraphQLError } = require('graphql');
-
 // *************** IMPORT MODULE ***************
+const { AppError } = require('../../../core/errors');
 const { TestModel } = require('../curriculum/curriculum.model');
 const { AcademicYearModel } = require('../enrollment/academic_year.model');
 const { StudentModel } = require('../../users/student/student.model');
@@ -20,8 +18,8 @@ const { SubmitTestGradesSchema } = require('./grading.validator');
  *
  * @param {Object} input - Payload containing academic year, test, and student scores.
  * @returns {Promise<Array>} Inserted student grade documents.
- * @throws {GraphQLError} 400 - Invalid student reference or duplicate payload student.
- * @throws {GraphQLError} 404 - Test or academic year not found.
+ * @throws {AppError} 400 - Invalid student reference or duplicate payload student.
+ * @throws {AppError} 404 - Test or academic year not found.
  */
 async function SubmitTestGradesHelper(input) {
   // *************** START: Validate input payload ***************
@@ -35,23 +33,11 @@ async function SubmitTestGradesHelper(input) {
   ]);
 
   if (!existingTest) {
-    throw new GraphQLError('Test not found', {
-      extensions: {
-        code: 'TEST_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('TEST_NOT_FOUND', 404, 'Test not found');
   }
 
   if (!existingAcademicYear) {
-    throw new GraphQLError('Academic year not found', {
-      extensions: {
-        code: 'ACADEMIC_YEAR_NOT_FOUND',
-        httpStatus: 404,
-        meta: null,
-      },
-    });
+    throw new AppError('ACADEMIC_YEAR_NOT_FOUND', 404, 'Academic year not found');
   }
   // *************** END: Validate curriculum and cohort references ***************
 
@@ -60,13 +46,7 @@ async function SubmitTestGradesHelper(input) {
   const uniqueStudentIds = [...new Set(extractedStudentIds)];
 
   if (uniqueStudentIds.length !== extractedStudentIds.length) {
-    throw new GraphQLError('Duplicate student grade input', {
-      extensions: {
-        code: 'DUPLICATE_STUDENT_GRADE_INPUT',
-        httpStatus: 400,
-        meta: null,
-      },
-    });
+    throw new AppError('DUPLICATE_STUDENT_GRADE_INPUT', 400, 'Duplicate student grade input');
   }
 
   const enrolledStudentIdSet = new Set(existingAcademicYear.student_ids.map((studentId) => String(studentId)));
@@ -93,33 +73,15 @@ async function SubmitTestGradesHelper(input) {
     const studentId = String(grade.student_id);
 
     if (!validStudentIdSet.has(studentId)) {
-      throw new GraphQLError('Invalid student reference', {
-        extensions: {
-          code: 'INVALID_STUDENT_REFERENCE',
-          httpStatus: 400,
-          meta: null,
-        },
-      });
+      throw new AppError('INVALID_STUDENT_REFERENCE', 400, 'Invalid student reference');
     }
 
     if (!enrolledStudentIdSet.has(studentId)) {
-      throw new GraphQLError('Student is not enrolled in academic year', {
-        extensions: {
-          code: 'STUDENT_NOT_ENROLLED_IN_ACADEMIC_YEAR',
-          httpStatus: 400,
-          meta: null,
-        },
-      });
+      throw new AppError('STUDENT_NOT_ENROLLED_IN_ACADEMIC_YEAR', 400, 'Student is not enrolled in academic year');
     }
 
     if (existingGradeStudentIdSet.has(studentId)) {
-      throw new GraphQLError('Student grade already exists', {
-        extensions: {
-          code: 'DUPLICATE_STUDENT_GRADE',
-          httpStatus: 409,
-          meta: null,
-        },
-      });
+      throw new AppError('DUPLICATE_STUDENT_GRADE', 409, 'Student grade already exists');
     }
   }
   // *************** END: Pre-validate every grade before bulk insert ***************
