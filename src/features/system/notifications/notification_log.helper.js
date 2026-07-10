@@ -203,6 +203,7 @@ async function FindMissingGradeRecords() {
  * @returns {string} Digest grouping key.
  */
 function BuildMissingGradeDigestKey(missingGrade) {
+  // *************** Combine stable identifiers so each digest represents one academic year, subject, and test
   return [
     missingGrade.academic_year_id.toString(),
     missingGrade.subject_id.toString(),
@@ -218,12 +219,15 @@ function BuildMissingGradeDigestKey(missingGrade) {
  * @returns {Array} Missing grade digest groups.
  */
 function GroupMissingGradesByTest(missingGrades) {
+  // *************** Store digest payloads by deterministic key to merge students into the same alert
   const digestMap = new Map();
 
   for (const missingGrade of missingGrades) {
+    // *************** Build the grouping key for the current missing grade candidate
     const digestKey = BuildMissingGradeDigestKey(missingGrade);
 
     if (!digestMap.has(digestKey)) {
+      // *************** Initialize a digest bucket the first time this test grouping is encountered
       digestMap.set(digestKey, {
         academic_year_id: missingGrade.academic_year_id,
         academic_year_name: missingGrade.academic_year_name,
@@ -235,6 +239,7 @@ function GroupMissingGradesByTest(missingGrades) {
       });
     }
 
+    // *************** Append the student to the existing digest bucket for this missing test score
     digestMap.get(digestKey).students.push({
       student_id: missingGrade.student_id,
       first_name: missingGrade.student_first_name,
@@ -243,6 +248,7 @@ function GroupMissingGradesByTest(missingGrades) {
     });
   }
 
+  // *************** Return grouped digest objects without exposing the internal lookup map
   return Array.from(digestMap.values());
 }
 
@@ -253,6 +259,7 @@ function GroupMissingGradesByTest(missingGrades) {
  * @returns {string} HTML-safe display value.
  */
 function EscapeHtml(value) {
+  // *************** Normalize nullable values before replacing HTML-sensitive characters
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -268,6 +275,7 @@ function EscapeHtml(value) {
  * @returns {Promise<void>}
  */
 function Wait(milliseconds) {
+  // *************** Wrap setTimeout in a promise so async audit flow can throttle sequentially
   return new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
   });
@@ -280,8 +288,10 @@ function Wait(milliseconds) {
  * @returns {string} HTML email body.
  */
 function BuildMissingGradeDigestEmailBody(missingGradeDigest) {
+  // *************** Render one escaped table row for each student missing the selected test grade
   const studentRows = missingGradeDigest.students
     .map((student, index) => {
+      // *************** Build a readable name while tolerating partially empty student profiles
       const studentName = `${student.first_name} ${student.last_name}`.trim();
 
       return `
@@ -294,6 +304,7 @@ function BuildMissingGradeDigestEmailBody(missingGradeDigest) {
     })
     .join('');
 
+  // *************** Compose the digest email body with escaped display values and computed totals
   return `
     <h2>Missing Grade Alert</h2>
     <p>Some grade entries are missing for the active academic year.</p>
@@ -329,6 +340,7 @@ function BuildMissingGradeDigestEmailBody(missingGradeDigest) {
  * @returns {Promise<void>}
  */
 async function CreateSentMissingGradeNotificationLogs(missingGradeDigest) {
+  // *************** Create one audit log per student so future cron runs can skip delivered alerts
   const notificationLogs = missingGradeDigest.students.map((student) => ({
     type: MISSING_GRADE_ALERT,
     student_id: student.student_id,
@@ -336,6 +348,7 @@ async function CreateSentMissingGradeNotificationLogs(missingGradeDigest) {
     academic_year_id: missingGradeDigest.academic_year_id,
   }));
 
+  // *************** Insert logs in order to make a partial failure easier to reason about operationally
   await NotificationLogModel.insertMany(notificationLogs, {
     ordered: true,
   });
@@ -365,6 +378,7 @@ async function RunMissingGradeAuditHelper() {
     }).select('email').lean();
 
     if (!teacherUser?.email) {
+      // *************** Record missing recipient configuration and stop this run without throwing
       await LogMissingGradeAuditError(new Error('Teacher email recipient not found'), {
         code: 'MISSING_GRADE_TEACHER_EMAIL_NOT_FOUND',
       });
@@ -383,17 +397,21 @@ async function RunMissingGradeAuditHelper() {
 
       try {
         if (digestIndex > 0) {
+          // *************** Pause after the first email to avoid triggering SMTP provider rate limits
           await Wait(MISSING_GRADE_EMAIL_THROTTLE_MS);
         }
 
+        // *************** Deliver the digest before persisting notification logs for retry correctness
         await SendEmail(
           teacherUser.email,
           `Missing grades: ${missingGradeDigest.test_name}`,
           BuildMissingGradeDigestEmailBody(missingGradeDigest),
         );
 
+        // *************** Mark each student/test alert as sent only after the email service succeeds
         await CreateSentMissingGradeNotificationLogs(missingGradeDigest);
       } catch (notificationError) {
+        // *************** Capture digest-specific context while allowing the remaining digests to continue
         await LogMissingGradeAuditError(notificationError, {
           academic_year_id: missingGradeDigest.academic_year_id,
           subject_id: missingGradeDigest.subject_id,
