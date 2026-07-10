@@ -1,5 +1,19 @@
+/**
+ * Grading business logic layer.
+ *
+ * Responsibility:
+ * - Validate bulk test grade submissions.
+ * - Preserve Day 6 all-or-nothing insert behavior.
+ * - Spawn the Day 8 academic standing worker after grades are inserted.
+ * - Keep the GraphQL response non-blocking while the worker aggregates standings.
+ */
+
+// *************** IMPORT LIBRARY ***************
+const path = require('path');
+const { Worker } = require('worker_threads');
+
 // *************** IMPORT MODULE ***************
-const { AppError } = require('../../../core/errors');
+const { AppError, LogAndNormalizeGqlError } = require('../../../core/errors');
 const { TestModel } = require('../curriculum/curriculum.model');
 const { AcademicYearModel } = require('../enrollment/academic_year.model');
 const { StudentModel } = require('../../users/student/student.model');
@@ -9,12 +23,121 @@ const { StudentGradeModel } = require('./student_grade.model');
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
 const { SubmitTestGradesSchema } = require('./grading.validator');
 
+// *************** GLOBAL VARIABLES ***************
+
+// Absolute path to the grade aggregation worker entry file.
+const GRADE_AGGREGATOR_WORKER_PATH = path.resolve(__dirname, '../../../workers/grade_aggregator.worker.js');
+
+// Error log source used for worker lifecycle failures observed by the main thread.
+const GRADE_AGGREGATOR_HELPER_SOURCE = 'src/features/academic/grading/grading.helper.js';
+
 // *************** HELPER FUNCTION ***************
+
+/**
+ * Logs grade aggregation worker lifecycle failures without blocking
+ * the grade submission response.
+ *
+ * The worker runs outside the GraphQL resolver call stack, so failures are
+ * reported here through the shared error logger instead of being thrown back
+ * to the client after the grade submission has already succeeded.
+ *
+ * @param {Error} error - Worker lifecycle error.
+ * @returns {void}
+ */
+function LogGradeAggregatorWorkerError(error) {
+  LogAndNormalizeGqlError(error, {
+    source: GRADE_AGGREGATOR_HELPER_SOURCE,
+  }).catch((logError) => {
+    console.error('Grade aggregator worker log failed:', logError);
+  });
+}
+
+/**
+ * Spawns the grade aggregation worker in a non-blocking flow.
+ *
+ * Only stringified identifiers are passed into workerData. This avoids
+ * structured clone issues and satisfies the Day 8 mandate to never pass
+ * Mongoose documents or model instances into a worker thread.
+ *
+ * @param {Object} input - Validated grade submission input.
+ * @param {string[]} studentIds - Student IDs included in the submitted batch.
+ * @returns {void}
+ */
+function SpawnGradeAggregatorWorker(input, studentIds) {
+  // *************** Send only serializable IDs to satisfy the worker stringification mandate
+  const payload = JSON.stringify({
+    student_ids: studentIds,
+    test_id: input.test_id,
+    academic_year_id: input.academic_year_id,
+  });
+
+  // *************** Spawn the background worker without awaiting so the API response stays non-blocking
+  const worker = new Worker(GRADE_AGGREGATOR_WORKER_PATH, {
+    workerData: payload,
+  });
+
+  // *************** Capture worker-reported operational failures from the parent process
+  worker.on('message', (message) => {
+    if (message?.status === 'error') {
+      LogGradeAggregatorWorkerError(
+        new AppError(
+          message.code || 'GRADE_AGGREGATOR_WORKER_FAILED',
+          500,
+          message.message || 'Grade aggregator worker failed',
+          {
+            test_id: input.test_id,
+            academic_year_id: input.academic_year_id,
+            student_ids: studentIds,
+          },
+        ),
+      );
+    }
+  });
+
+  // *************** Capture worker thread crashes that surface through the runtime error event
+  worker.on('error', (workerError) => {
+    LogGradeAggregatorWorkerError(
+      new AppError(
+        workerError.code || 'GRADE_AGGREGATOR_WORKER_ERROR',
+        workerError.httpStatus || 500,
+        workerError.message || 'Grade aggregator worker failed',
+        {
+          test_id: input.test_id,
+          academic_year_id: input.academic_year_id,
+          student_ids: studentIds,
+        },
+      ),
+    );
+  });
+
+  // *************** Capture abnormal worker exits after the background process terminates
+  worker.on('exit', (exitCode) => {
+    if (exitCode !== 0) {
+      LogGradeAggregatorWorkerError(
+        new AppError(
+          'GRADE_AGGREGATOR_WORKER_EXITED',
+          500,
+          `Grade aggregator worker exited with code ${exitCode}`,
+          {
+            test_id: input.test_id,
+            academic_year_id: input.academic_year_id,
+            student_ids: studentIds,
+            exit_code: exitCode,
+          },
+        ),
+      );
+    }
+  });
+}
 
 /**
  * Submits a batch of test grades
  * using pre-validation before any
  * database write occurs.
+ *
+ * The academic standing worker is spawned only after StudentGrade insertMany
+ * succeeds. The worker is intentionally not awaited so the mutation can return
+ * the inserted grade documents while aggregation continues in the background.
  *
  * @param {Object} input - Payload containing academic year, test, and student scores.
  * @returns {Promise<Array>} Inserted student grade documents.
@@ -96,6 +219,10 @@ async function SubmitTestGradesHelper(input) {
 
   const insertedGrades = await StudentGradeModel.insertMany(mappedGrades, { ordered: true });
   // *************** END: Transform and insert grade batch ***************
+
+  // *************** START: Trigger non-blocking academic standing aggregation ***************
+  SpawnGradeAggregatorWorker(validatedInput, uniqueStudentIds);
+  // *************** END: Trigger non-blocking academic standing aggregation ***************
 
   return insertedGrades;
 }
