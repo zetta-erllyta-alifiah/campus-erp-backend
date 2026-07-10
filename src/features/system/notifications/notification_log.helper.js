@@ -1,6 +1,6 @@
 // *************** IMPORT MODULE ***************
 const { AcademicYearModel } = require('../../academic/enrollment/academic_year.model');
-const { ErrorLogModel } = require('../../../core/errors/error_log.model');
+const { AppError, LogAndNormalizeGqlError } = require('../../../core/errors');
 const { SendEmail } = require('../../../shared/services/email.service');
 const { UserModel } = require('../../users/user/user.model');
 const { NotificationLogModel } = require('./notification_log.model');
@@ -19,22 +19,41 @@ const MISSING_GRADE_EMAIL_THROTTLE_MS = 1100;
 // *************** HELPER FUNCTION ***************
 
 /**
- * Logs a background audit error without interrupting the cron process.
+ * Logs a missing grade cron operational error without interrupting the scheduler.
  *
- * @param {Error} error - Error thrown by the background audit.
+ * This is not a business audit trail. It writes cron failures to the shared
+ * error log collection through the core GraphQL error logger, while ignoring
+ * the returned GraphQL error because background jobs do not return a transport response.
+ *
+ * @param {Error} error - Error thrown by the background cron process.
  * @param {Object} meta - Context metadata for debugging.
  * @returns {Promise<void>}
  */
-async function LogMissingGradeAuditError(error, meta = null) {
+async function LogMissingGradeCronError(error, meta = null) {
   try {
-    // *************** Persist audit failures for later operational review
-    await ErrorLogModel.create({
-      message: error.message || 'Missing grade auditor failed',
-      code: error.code || 'MISSING_GRADE_AUDITOR_ERROR',
-      http_status: error.httpStatus || 500,
+    // *************** Normalize raw cron errors into operational errors before writing to error_logs
+    const errorToLog =
+      error instanceof AppError || error?.isOperational
+        ? error
+        : new AppError(
+            error.code || 'MISSING_GRADE_AUDITOR_ERROR',
+            error.httpStatus || 500,
+            error.message || 'Missing grade auditor failed',
+            meta,
+          );
+
+    if (!errorToLog.meta && meta) {
+      // *************** Attach cron context so the shared logger can persist useful debugging metadata
+      errorToLog.meta = meta;
+    }
+
+    if (!errorToLog.stack && error.stack) {
+      // *************** Preserve the original stack when a raw error was wrapped as AppError
+      errorToLog.stack = error.stack;
+    }
+
+    await LogAndNormalizeGqlError(errorToLog, {
       source: MISSING_GRADE_AUDITOR_SOURCE,
-      stack: error.stack || null,
-      meta,
     });
   } catch (logError) {
     // *************** Keep the cron process alive even when error logging fails
@@ -379,9 +398,9 @@ async function RunMissingGradeAuditHelper() {
 
     if (!teacherUser?.email) {
       // *************** Record missing recipient configuration and stop this run without throwing
-      await LogMissingGradeAuditError(new Error('Teacher email recipient not found'), {
-        code: 'MISSING_GRADE_TEACHER_EMAIL_NOT_FOUND',
-      });
+      await LogMissingGradeCronError(
+        new AppError('MISSING_GRADE_TEACHER_EMAIL_NOT_FOUND', 500, 'Teacher email recipient not found'),
+      );
       return;
     }
     // *************** END: Resolve teacher notification recipient ***************
@@ -412,7 +431,7 @@ async function RunMissingGradeAuditHelper() {
         await CreateSentMissingGradeNotificationLogs(missingGradeDigest);
       } catch (notificationError) {
         // *************** Capture digest-specific context while allowing the remaining digests to continue
-        await LogMissingGradeAuditError(notificationError, {
+        await LogMissingGradeCronError(notificationError, {
           academic_year_id: missingGradeDigest.academic_year_id,
           subject_id: missingGradeDigest.subject_id,
           test_id: missingGradeDigest.test_id,
@@ -422,7 +441,7 @@ async function RunMissingGradeAuditHelper() {
     }
     // *************** END: Send one digest alert per test and write logs only after success ***************
   } catch (jobError) {
-    await LogMissingGradeAuditError(jobError);
+    await LogMissingGradeCronError(jobError);
   }
 }
 
