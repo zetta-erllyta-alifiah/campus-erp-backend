@@ -35,6 +35,13 @@ const AcademicStandingTestSchema = new mongoose.Schema(
       enum: ACADEMIC_STANDING_STATUSES,
       required: true,
     },
+
+    // Indicates whether this test had a submitted StudentGrade during aggregation.
+    is_graded: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
   },
   {
     _id: false,

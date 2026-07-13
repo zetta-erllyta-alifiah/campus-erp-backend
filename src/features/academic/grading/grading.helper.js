@@ -75,9 +75,28 @@ function SpawnGradeAggregatorWorker(input, studentIds) {
 
   // *************** START: Spawn non-blocking worker ***************
   // *************** Spawn the background worker without awaiting so the API response stays non-blocking
-  const worker = new Worker(GRADE_AGGREGATOR_WORKER_PATH, {
-    workerData: payload,
-  });
+  let worker;
+
+  try {
+    worker = new Worker(GRADE_AGGREGATOR_WORKER_PATH, {
+      workerData: payload,
+    });
+  } catch (workerBootstrapError) {
+    // *************** Log worker bootstrap failures without failing the already-committed grade mutation
+    LogGradeAggregatorWorkerError(
+      new AppError(
+        workerBootstrapError.code || 'GRADE_AGGREGATOR_WORKER_BOOTSTRAP_FAILED',
+        workerBootstrapError.httpStatus || 500,
+        workerBootstrapError.message || 'Grade aggregator worker bootstrap failed',
+        {
+          test_id: input.test_id,
+          academic_year_id: input.academic_year_id,
+          student_ids: studentIds,
+        },
+      ),
+    );
+    return;
+  }
   // *************** END: Spawn non-blocking worker ***************
 
   // *************** START: Register worker lifecycle listeners ***************
