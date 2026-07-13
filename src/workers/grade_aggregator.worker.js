@@ -332,17 +332,31 @@ function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy
   // *************** Build the subject snapshots and their nested test snapshots for one student
   const subjects = hierarchy.subjects.map((subject) => {
     const subjectTests = testsBySubjectId.get(subject._id.toString()) || [];
-    const computedTests = subjectTests.map((test) => {
-      // *************** Missing scores are treated as zero so the snapshot remains complete
-      const totalMark = RoundMark(scoreLookup.get(BuildScoreLookupKey(studentId, test._id)) || 0);
+    const computedTests = subjectTests
+      .map((test) => {
+        const scoreLookupKey = BuildScoreLookupKey(studentId, test._id);
 
-      return {
-        test_id: test._id,
-        weightage: test.weightage,
-        total_mark: totalMark,
-        test_status: EvaluateStandingStatus(totalMark, test.grading_rules),
-      };
-    });
+        // *************** Exclude unsubmitted grades instead of treating missing scores as earned zeroes
+        if (!scoreLookup.has(scoreLookupKey)) {
+          return null;
+        }
+
+        // *************** Preserve an explicitly submitted zero as a valid score in the standing calculation
+        const totalMark = RoundMark(scoreLookup.get(scoreLookupKey));
+
+        return {
+          test_id: test._id,
+          weightage: test.weightage,
+          total_mark: totalMark,
+          test_status: EvaluateStandingStatus(totalMark, test.grading_rules),
+        };
+      })
+      .filter(Boolean);
+
+    // *************** Exclude subjects with no submitted test grades from the provisional block standing
+    if (computedTests.length === 0) {
+      return null;
+    }
 
     const subjectAverage = CalculateAverage(computedTests, 'total_mark', 'weightage');
 
@@ -357,7 +371,7 @@ function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy
         test_status: test.test_status,
       })),
     };
-  });
+  }).filter(Boolean);
 
   // *************** Aggregate subject averages into the block-level standing
   const blockAverage = CalculateAverage(subjects, 'subject_average', 'weightage');
