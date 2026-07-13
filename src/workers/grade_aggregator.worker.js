@@ -8,9 +8,11 @@
  * - Persist computed standings through bulkWrite.
  */
 
+// *************** IMPORT CORE ***************
+const { parentPort, workerData } = require('worker_threads');
+
 // *************** IMPORT LIBRARY ***************
 const mongoose = require('mongoose');
-const { parentPort, workerData } = require('worker_threads');
 
 // *************** IMPORT MODULE ***************
 const { ConnectDatabase } = require('../core/db');
@@ -393,31 +395,43 @@ function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy
  * @returns {Promise<void>}
  */
 async function RunGradeAggregatorWorker() {
+  // *************** START: Parse worker payload ***************
   const payload = ParseWorkerPayload();
+  // *************** END: Parse worker payload ***************
 
+  // *************** START: Initialize worker database context ***************
   // *************** Establish a dedicated MongoDB connection inside the worker isolate
   await ConnectDatabase();
 
   // *************** Ensure AcademicStanding indexes exist before running upsert bulk operations
   await AcademicStandingModel.init();
+  // *************** END: Initialize worker database context ***************
 
+  // *************** START: Load curriculum hierarchy and submitted grade scores ***************
   const hierarchy = await LoadCurriculumHierarchy(payload.test_id);
   const scoreLookup = await BuildScoreLookup(payload.student_ids, hierarchy.tests, payload.academic_year_id);
+  // *************** END: Load curriculum hierarchy and submitted grade scores ***************
+
+  // *************** START: Build one upsert operation per student standing snapshot ***************
   const bulkOperations = payload.student_ids.map((studentId) => {
     return BuildAcademicStandingBulkOperation(studentId, payload.academic_year_id, hierarchy, scoreLookup);
   });
+  // *************** END: Build one upsert operation per student standing snapshot ***************
 
+  // *************** START: Persist academic standings in bulk ***************
   if (bulkOperations.length > 0) {
     // *************** Persist all student standing snapshots in one database round-trip
     await AcademicStandingModel.bulkWrite(bulkOperations, {
       ordered: false,
     });
   }
+  // *************** END: Persist academic standings in bulk ***************
 
-  // *************** Notify the parent thread that background aggregation completed successfully
+  // *************** START: Notify parent thread of successful completion ***************
   parentPort.postMessage({
     status: 'success',
   });
+  // *************** END: Notify parent thread of successful completion ***************
 }
 
 /**

@@ -8,7 +8,7 @@
  * - Keep the GraphQL response non-blocking while the worker aggregates standings.
  */
 
-// *************** IMPORT LIBRARY ***************
+// *************** IMPORT CORE ***************
 const path = require('path');
 const { Worker } = require('worker_threads');
 
@@ -64,18 +64,23 @@ function LogGradeAggregatorWorkerError(error) {
  * @returns {void}
  */
 function SpawnGradeAggregatorWorker(input, studentIds) {
+  // *************** START: Build worker payload ***************
   // *************** Send only serializable IDs to satisfy the worker stringification mandate
   const payload = JSON.stringify({
     student_ids: studentIds,
     test_id: input.test_id,
     academic_year_id: input.academic_year_id,
   });
+  // *************** END: Build worker payload ***************
 
+  // *************** START: Spawn non-blocking worker ***************
   // *************** Spawn the background worker without awaiting so the API response stays non-blocking
   const worker = new Worker(GRADE_AGGREGATOR_WORKER_PATH, {
     workerData: payload,
   });
+  // *************** END: Spawn non-blocking worker ***************
 
+  // *************** START: Register worker lifecycle listeners ***************
   // *************** Capture worker-reported operational failures from the parent process
   worker.on('message', (message) => {
     if (message?.status === 'error') {
@@ -128,6 +133,7 @@ function SpawnGradeAggregatorWorker(input, studentIds) {
       );
     }
   });
+  // *************** END: Register worker lifecycle listeners ***************
 }
 
 /**
