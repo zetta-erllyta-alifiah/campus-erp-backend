@@ -134,6 +134,19 @@ const AcademicStandingSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Monotonic grade snapshot key used to prevent stale worker writes.
+    aggregation_version_key: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+
+    // Timestamp component of the grade snapshot version for operational inspection.
+    aggregation_version_at: {
+      type: Date,
+      default: null,
+    },
+
     // Computed standings for the subjects that belong to this block.
     subjects: {
       type: [AcademicStandingSubjectSchema],

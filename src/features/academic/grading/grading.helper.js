@@ -14,10 +14,11 @@ const { Worker } = require('worker_threads');
 
 // *************** IMPORT MODULE ***************
 const { AppError, LogAndNormalizeGqlError } = require('../../../core/errors');
-const { TestModel } = require('../curriculum/curriculum.model');
+const { BlockModel, SubjectModel, TestModel } = require('../curriculum/curriculum.model');
 const { AcademicYearModel } = require('../enrollment/academic_year.model');
 const { StudentModel } = require('../../users/student/student.model');
 const { StudentGradeModel } = require('./student_grade.model');
+const { AcademicStandingModel } = require('./academic_standing.model');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -47,9 +48,33 @@ const GRADE_AGGREGATOR_HELPER_SOURCE = 'src/features/academic/grading/grading.he
 function LogGradeAggregatorWorkerError(error) {
   LogAndNormalizeGqlError(error, {
     source: GRADE_AGGREGATOR_HELPER_SOURCE,
-  }).catch((logError) => {
-    console.error('Grade aggregator worker log failed:', logError);
   });
+}
+
+/**
+ * Confirms that the submitted test hierarchy belongs to the selected academic year.
+ *
+ * @param {Object} existingSubject - Parent subject for the submitted test.
+ * @param {Object} existingAcademicYear - Selected academic year document.
+ * @param {Object|null} matchingBlock - Block matched by id and academic year.
+ * @returns {void}
+ * @throws {AppError} When either side of the academic year relationship is invalid.
+ */
+function ValidateGradeSubmissionAcademicYear(existingSubject, existingAcademicYear, matchingBlock) {
+  const academicYearBlockIdSet = new Set(existingAcademicYear.block_ids.map((blockId) => String(blockId)));
+
+  if (!matchingBlock || !academicYearBlockIdSet.has(String(existingSubject.block_id))) {
+    throw new AppError('TEST_ACADEMIC_YEAR_MISMATCH', 400, 'Test does not belong to the selected academic year');
+  }
+}
+
+/**
+ * Initializes indexes required by grade aggregation before workers run.
+ *
+ * @returns {Promise<void>}
+ */
+async function InitializeGradeAggregationIndexes() {
+  await Promise.all([AcademicStandingModel.init(), SubjectModel.init(), TestModel.init()]);
 }
 
 /**
@@ -176,8 +201,8 @@ async function SubmitTestGradesHelper(input) {
 
   // *************** START: Validate curriculum and cohort references ***************
   const [existingTest, existingAcademicYear] = await Promise.all([
-    TestModel.findById(validatedInput.test_id).select('_id').lean(),
-    AcademicYearModel.findById(validatedInput.academic_year_id).select('_id student_ids').lean(),
+    TestModel.findById(validatedInput.test_id).select('_id subject_id').lean(),
+    AcademicYearModel.findById(validatedInput.academic_year_id).select('_id block_ids student_ids').lean(),
   ]);
 
   if (!existingTest) {
@@ -187,6 +212,20 @@ async function SubmitTestGradesHelper(input) {
   if (!existingAcademicYear) {
     throw new AppError('ACADEMIC_YEAR_NOT_FOUND', 404, 'Academic year not found');
   }
+
+  const existingSubject = await SubjectModel.findById(existingTest.subject_id).select('_id block_id').lean();
+
+  if (!existingSubject) {
+    throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
+  }
+
+  const matchingBlock = await BlockModel.findOne({
+    _id: existingSubject.block_id,
+    academic_year_id: validatedInput.academic_year_id,
+  })
+    .select('_id')
+    .lean();
+  ValidateGradeSubmissionAcademicYear(existingSubject, existingAcademicYear, matchingBlock);
   // *************** END: Validate curriculum and cohort references ***************
 
   // *************** START: Prepare student reference validation ***************
@@ -254,5 +293,7 @@ async function SubmitTestGradesHelper(input) {
 
 // *************** EXPORT MODULE ***************
 module.exports = {
+  InitializeGradeAggregationIndexes,
   SubmitTestGradesHelper,
+  ValidateGradeSubmissionAcademicYear,
 };

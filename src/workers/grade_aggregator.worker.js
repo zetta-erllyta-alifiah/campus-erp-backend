@@ -9,7 +9,7 @@
  */
 
 // *************** IMPORT CORE ***************
-const { parentPort, workerData } = require('worker_threads');
+const { parentPort, workerData, isMainThread } = require('worker_threads');
 
 // *************** IMPORT LIBRARY ***************
 const mongoose = require('mongoose');
@@ -20,6 +20,7 @@ const { AppError } = require('../core/errors');
 const { BlockModel, SubjectModel, TestModel } = require('../features/academic/curriculum/curriculum.model');
 const { StudentGradeModel } = require('../features/academic/grading/student_grade.model');
 const { AcademicStandingModel } = require('../features/academic/grading/academic_standing.model');
+const { AcademicYearModel } = require('../features/academic/enrollment/academic_year.model');
 
 // *************** GLOBAL VARIABLES ***************
 
@@ -30,8 +31,11 @@ const STANDING_STATUS_BY_LABEL = {
   retake: 'Retake',
 };
 
-// Fallback standing when no dynamic grading rule matches the computed value.
-const DEFAULT_STANDING_STATUS = 'Fail';
+// Comparison operators allowed by the curriculum grading rule schema.
+const VALID_RULE_OPERATORS = new Set(['>', '>=', '<', '<=', '==']);
+
+// Maximum attempts for the narrow duplicate-key race between concurrent first upserts.
+const MAX_BULK_WRITE_ATTEMPTS = 2;
 
 // *************** WORKER HELPER FUNCTION ***************
 
@@ -57,7 +61,7 @@ function CompareRuleValue(value, operator, threshold) {
     case '==':
       return value === threshold;
     default:
-      return false;
+      throw new AppError('INVALID_GRADING_RULE_OPERATOR', 500, 'Invalid grading rule operator');
   }
 }
 
@@ -98,7 +102,34 @@ function BuildRulePriority(rule) {
  */
 function NormalizeStandingStatus(label) {
   // *************** Normalize database rule labels to the enum casing required by AcademicStanding
-  return STANDING_STATUS_BY_LABEL[String(label || '').trim().toLowerCase()] || DEFAULT_STANDING_STATUS;
+  const normalizedStatus = STANDING_STATUS_BY_LABEL[String(label || '').trim().toLowerCase()];
+
+  if (!normalizedStatus) {
+    throw new AppError('INVALID_GRADING_RULE_LABEL', 500, 'Invalid grading rule label');
+  }
+
+  return normalizedStatus;
+}
+
+/**
+ * Validates the dynamic grading rules before a standing is computed.
+ *
+ * @param {Array} gradingRules - Dynamic curriculum grading rules.
+ * @returns {void}
+ * @throws {AppError} When rules are missing or malformed.
+ */
+function ValidateGradingRules(gradingRules) {
+  if (!Array.isArray(gradingRules) || gradingRules.length === 0) {
+    throw new AppError('GRADING_RULES_REQUIRED', 500, 'Grading rules are required');
+  }
+
+  for (const rule of gradingRules) {
+    if (!rule || !VALID_RULE_OPERATORS.has(rule.operator) || typeof rule.threshold !== 'number' || !Number.isFinite(rule.threshold)) {
+      throw new AppError('INVALID_GRADING_RULE', 500, 'Invalid grading rule');
+    }
+
+    NormalizeStandingStatus(rule.label);
+  }
 }
 
 /**
@@ -109,13 +140,19 @@ function NormalizeStandingStatus(label) {
  * @returns {string} Computed standing status.
  */
 function EvaluateStandingStatus(value, gradingRules) {
+  ValidateGradingRules(gradingRules);
+
+  if (!Number.isFinite(Number(value))) {
+    throw new AppError('INVALID_GRADING_VALUE', 500, 'Invalid grading value');
+  }
+
   // *************** Match the computed score against every dynamic rule from the curriculum document
-  const matchingRules = (gradingRules || []).filter((rule) => {
+  const matchingRules = gradingRules.filter((rule) => {
     return CompareRuleValue(Number(value), rule.operator, Number(rule.threshold));
   });
 
   if (matchingRules.length === 0) {
-    return DEFAULT_STANDING_STATUS;
+    throw new AppError('GRADING_RULE_MATCH_NOT_FOUND', 500, 'No grading rule matched the computed value');
   }
 
   // *************** Sort matching rules so overlapping dynamic ranges resolve deterministically
@@ -189,14 +226,54 @@ function BuildScoreLookupKey(studentId, testId) {
 }
 
 /**
+ * Builds a monotonic version key from a grade document.
+ *
+ * @param {Object} grade - Student grade document.
+ * @returns {string} Stable version key.
+ */
+function BuildGradeVersionKey(grade) {
+  const versionDate = grade.updated_at || grade.created_at;
+
+  if (!versionDate || Number.isNaN(new Date(versionDate).getTime()) || !grade._id) {
+    throw new AppError('INVALID_GRADE_VERSION', 500, 'Invalid grade version');
+  }
+
+  return `${new Date(versionDate).toISOString()}|${grade._id.toString()}`;
+}
+
+/**
+ * Builds a deterministic snapshot version from the latest grade and grade count.
+ *
+ * The count makes an immutable newer snapshot sort after an older snapshot even
+ * when two inserts share a timestamp and the newer ObjectId sorts lower.
+ *
+ * @param {string} latestGradeVersionKey - Latest timestamp and grade identifier.
+ * @param {number} gradeCount - Number of grades included in the student snapshot.
+ * @returns {string} Monotonic aggregation snapshot key.
+ */
+function BuildAggregationVersionKey(latestGradeVersionKey, gradeCount) {
+  if (!latestGradeVersionKey || !Number.isInteger(gradeCount) || gradeCount < 1) {
+    throw new AppError('INVALID_AGGREGATION_VERSION', 500, 'Invalid aggregation version');
+  }
+
+  return `${latestGradeVersionKey}|${String(gradeCount).padStart(12, '0')}`;
+}
+
+/**
  * Validates and parses the worker payload.
  *
  * @returns {Object} Parsed worker payload.
  * @throws {AppError} When payload is invalid.
  */
-function ParseWorkerPayload() {
+function ParseWorkerPayload(serializedWorkerData = workerData) {
   // *************** Parse only the stringified ID payload required by the worker thread mandate
-  const payload = JSON.parse(workerData);
+  let payload;
+
+  try {
+    payload = JSON.parse(serializedWorkerData);
+  } catch (error) {
+    throw new AppError('INVALID_GRADE_AGGREGATOR_PAYLOAD', 400, 'Invalid grade aggregator payload');
+  }
 
   if (!Array.isArray(payload.student_ids) || !payload.student_ids.length) {
     // *************** Reject empty worker payloads before any database work begins
@@ -219,38 +296,71 @@ function ParseWorkerPayload() {
 }
 
 /**
+ * Verifies that the selected curriculum block belongs to the requested
+ * academic year from both sides of the relationship.
+ *
+ * @param {Object} block - Curriculum block document.
+ * @param {string} academicYearId - Requested academic year identifier.
+ * @returns {Promise<void>}
+ * @throws {AppError} When the hierarchy does not belong to the selected year.
+ */
+async function ValidateAcademicYearHierarchy(block, academicYearId) {
+  if (!block?._id || !block?.academic_year_id) {
+    throw new AppError('INVALID_CURRICULUM_HIERARCHY', 500, 'Invalid curriculum hierarchy');
+  }
+
+  if (block.academic_year_id.toString() !== academicYearId.toString()) {
+    throw new AppError('TEST_ACADEMIC_YEAR_MISMATCH', 400, 'Test does not belong to the selected academic year');
+  }
+
+  const academicYear = await AcademicYearModel.findOne({
+    _id: academicYearId,
+    block_ids: block._id,
+  })
+    .select('_id')
+    .lean();
+
+  if (!academicYear) {
+    throw new AppError('ACADEMIC_YEAR_BLOCK_MISMATCH', 400, 'Block does not belong to the selected academic year');
+  }
+}
+/**
  * Loads the curriculum hierarchy for the submitted test.
  *
  * @param {string} testId - Submitted test identifier.
+ * @param {string} academicYearId - Requested academic year identifier.
  * @returns {Promise<Object>} Block, subject, and test hierarchy.
  * @throws {AppError} When hierarchy references are missing.
  */
-async function LoadCurriculumHierarchy(testId) {
+async function LoadCurriculumHierarchy(testId, academicYearId) {
   // *************** Load the submitted test to discover its parent subject and block
-  const submittedTest = await TestModel.findById(testId).lean();
+  const submittedTest = await TestModel.findById(testId).select('_id subject_id').lean();
 
   if (!submittedTest) {
     throw new AppError('TEST_NOT_FOUND', 404, 'Test not found');
   }
 
   // *************** Load the parent subject that owns the submitted test
-  const submittedSubject = await SubjectModel.findById(submittedTest.subject_id).lean();
+  const submittedSubject = await SubjectModel.findById(submittedTest.subject_id).select('_id block_id').lean();
 
   if (!submittedSubject) {
     throw new AppError('SUBJECT_NOT_FOUND', 404, 'Subject not found');
   }
 
   // *************** Load the parent block that owns the submitted subject
-  const block = await BlockModel.findById(submittedSubject.block_id).lean();
+  const block = await BlockModel.findById(submittedSubject.block_id).select('_id academic_year_id grading_rules').lean();
 
   if (!block) {
     throw new AppError('BLOCK_NOT_FOUND', 404, 'Block not found');
   }
 
+  await ValidateAcademicYearHierarchy(block, academicYearId);
+
   // *************** Load every subject in the block so block standing reflects the full hierarchy
   const subjects = await SubjectModel.find({
     block_id: block._id,
   })
+    .select('_id weightage grading_rules')
     .sort({ created_at: 1, _id: 1 })
     .lean();
 
@@ -262,7 +372,8 @@ async function LoadCurriculumHierarchy(testId) {
       $in: subjectIds,
     },
   })
-    .sort({ created_at: 1, _id: 1 })
+    .select('_id subject_id weightage grading_rules')
+    .sort({ subject_id: 1, created_at: 1, _id: 1 })
     .lean();
 
   return {
@@ -293,17 +404,39 @@ async function BuildScoreLookup(studentIds, tests, academicYearId) {
     },
     academic_year_id: academicYearId,
   })
-    .select('student_id test_id score')
+    .select('_id student_id test_id score created_at updated_at')
     .lean();
 
   const scoreLookup = new Map();
+  const aggregationVersionByStudentId = new Map();
+  const gradeCountByStudentId = new Map();
 
   // *************** Store scores by student/test pair for fast standing construction
   for (const grade of grades) {
     scoreLookup.set(BuildScoreLookupKey(grade.student_id, grade.test_id), Number(grade.score || 0));
+
+    const studentId = grade.student_id.toString();
+    const gradeVersionKey = BuildGradeVersionKey(grade);
+    const currentVersionKey = aggregationVersionByStudentId.get(studentId);
+
+    gradeCountByStudentId.set(studentId, (gradeCountByStudentId.get(studentId) || 0) + 1);
+
+    if (!currentVersionKey || gradeVersionKey > currentVersionKey) {
+      aggregationVersionByStudentId.set(studentId, gradeVersionKey);
+    }
   }
 
-  return scoreLookup;
+  for (const [studentId, latestGradeVersionKey] of aggregationVersionByStudentId) {
+    aggregationVersionByStudentId.set(
+      studentId,
+      BuildAggregationVersionKey(latestGradeVersionKey, gradeCountByStudentId.get(studentId)),
+    );
+  }
+
+  return {
+    scoreLookup,
+    aggregationVersionByStudentId,
+  };
 }
 
 /**
@@ -315,7 +448,11 @@ async function BuildScoreLookup(studentIds, tests, academicYearId) {
  * @param {Map} scoreLookup - Student/test score lookup map.
  * @returns {Object} bulkWrite updateOne operation.
  */
-function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy, scoreLookup) {
+function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy, scoreLookup, aggregationVersionKey) {
+  if (!aggregationVersionKey) {
+    throw new AppError('GRADE_AGGREGATOR_VERSION_REQUIRED', 500, 'Grade aggregation version is required');
+  }
+
   const testsBySubjectId = new Map();
 
   // *************** Group tests by subject so each standing document keeps Subject -> Test nesting
@@ -366,6 +503,21 @@ function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy
 
   // *************** Aggregate subject averages into the block-level standing
   const blockAverage = CalculateAverage(subjects, 'subject_average', 'weightage');
+  const aggregationVersionAt = new Date(aggregationVersionKey.split('|')[0]);
+  const shouldApplyIncomingSnapshot = {
+    $lte: [
+      {
+        $ifNull: ['$aggregation_version_key', ''],
+      },
+      aggregationVersionKey,
+    ],
+  };
+  const standingSubjects = subjects.map((subject) => ({
+    subject_id: subject.subject_id,
+    subject_average: subject.subject_average,
+    subject_status: subject.subject_status,
+    tests: subject.tests,
+  }));
 
   return {
     updateOne: {
@@ -374,24 +526,84 @@ function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy
         academic_year_id: academicYearId,
         block_id: hierarchy.block._id,
       },
-      update: {
-        $set: {
-          student_id: studentId,
-          academic_year_id: academicYearId,
-          block_id: hierarchy.block._id,
-          block_average: blockAverage,
-          block_status: EvaluateStandingStatus(blockAverage, hierarchy.block.grading_rules),
-          subjects: subjects.map((subject) => ({
-            subject_id: subject.subject_id,
-            subject_average: subject.subject_average,
-            subject_status: subject.subject_status,
-            tests: subject.tests,
-          })),
+      update: [
+        {
+          $set: {
+            student_id: new mongoose.Types.ObjectId(studentId),
+            academic_year_id: new mongoose.Types.ObjectId(academicYearId),
+            block_id: hierarchy.block._id,
+            aggregation_version_key: {
+              $cond: [shouldApplyIncomingSnapshot, aggregationVersionKey, '$aggregation_version_key'],
+            },
+            aggregation_version_at: {
+              $cond: [shouldApplyIncomingSnapshot, aggregationVersionAt, '$aggregation_version_at'],
+            },
+            block_average: {
+              $cond: [shouldApplyIncomingSnapshot, blockAverage, '$block_average'],
+            },
+            block_status: {
+              $cond: [
+                shouldApplyIncomingSnapshot,
+                EvaluateStandingStatus(blockAverage, hierarchy.block.grading_rules),
+                '$block_status',
+              ],
+            },
+            subjects: {
+              $cond: [shouldApplyIncomingSnapshot, standingSubjects, '$subjects'],
+            },
+          },
         },
-      },
+      ],
       upsert: true,
     },
   };
+}
+
+/**
+ * Checks whether a bulk-write error contains only duplicate-key write errors.
+ *
+ * @param {Error} error - Mongoose or MongoDB bulk-write error.
+ * @returns {boolean} Whether retrying the idempotent upserts is safe.
+ */
+function IsDuplicateKeyBulkWriteError(error) {
+  const writeErrors = error?.writeErrors || error?.result?.getWriteErrors?.() || [];
+
+  if (writeErrors.length > 0) {
+    return writeErrors.every((writeError) => writeError.code === 11000);
+  }
+
+  return error?.code === 11000;
+}
+
+/**
+ * Persists standing snapshots and retries the concurrent first-upsert race.
+ *
+ * A unique standing index can make two simultaneous upserts race when neither
+ * worker initially sees a document. Retrying after the duplicate-key result
+ * turns the losing insert into a normal version-guarded update.
+ *
+ * @param {Object[]} bulkOperations - Standing updateOne operations.
+ * @param {Object} [standingModel=AcademicStandingModel] - Persistence model.
+ * @returns {Promise<Object>} MongoDB bulk-write result.
+ */
+async function ExecuteAcademicStandingBulkWrite(bulkOperations, standingModel = AcademicStandingModel) {
+  let attempt = 0;
+
+  while (attempt < MAX_BULK_WRITE_ATTEMPTS) {
+    try {
+      return await standingModel.bulkWrite(bulkOperations, {
+        ordered: false,
+      });
+    } catch (error) {
+      attempt += 1;
+
+      if (!IsDuplicateKeyBulkWriteError(error) || attempt >= MAX_BULK_WRITE_ATTEMPTS) {
+        throw error;
+      }
+    }
+  }
+
+  throw new AppError('GRADE_AGGREGATOR_BULK_WRITE_FAILED', 500, 'Grade aggregation bulk write failed');
 }
 
 /**
@@ -406,29 +618,37 @@ async function RunGradeAggregatorWorker() {
 
   // *************** START: Initialize worker database context ***************
   // *************** Establish a dedicated MongoDB connection inside the worker isolate
-  await ConnectDatabase();
+  await ConnectDatabase({
+    autoIndex: false,
+  });
 
-  // *************** Ensure AcademicStanding indexes exist before running upsert bulk operations
-  await AcademicStandingModel.init();
   // *************** END: Initialize worker database context ***************
 
   // *************** START: Load curriculum hierarchy and submitted grade scores ***************
-  const hierarchy = await LoadCurriculumHierarchy(payload.test_id);
-  const scoreLookup = await BuildScoreLookup(payload.student_ids, hierarchy.tests, payload.academic_year_id);
+  const hierarchy = await LoadCurriculumHierarchy(payload.test_id, payload.academic_year_id);
+  const { scoreLookup, aggregationVersionByStudentId } = await BuildScoreLookup(
+    payload.student_ids,
+    hierarchy.tests,
+    payload.academic_year_id,
+  );
   // *************** END: Load curriculum hierarchy and submitted grade scores ***************
 
   // *************** START: Build one upsert operation per student standing snapshot ***************
   const bulkOperations = payload.student_ids.map((studentId) => {
-    return BuildAcademicStandingBulkOperation(studentId, payload.academic_year_id, hierarchy, scoreLookup);
+    return BuildAcademicStandingBulkOperation(
+      studentId,
+      payload.academic_year_id,
+      hierarchy,
+      scoreLookup,
+      aggregationVersionByStudentId.get(studentId),
+    );
   });
   // *************** END: Build one upsert operation per student standing snapshot ***************
 
   // *************** START: Persist academic standings in bulk ***************
   if (bulkOperations.length > 0) {
     // *************** Persist all student standing snapshots in one database round-trip
-    await AcademicStandingModel.bulkWrite(bulkOperations, {
-      ordered: false,
-    });
+    await ExecuteAcademicStandingBulkWrite(bulkOperations);
   }
   // *************** END: Persist academic standings in bulk ***************
 
@@ -448,9 +668,9 @@ async function RunGradeAggregatorWorker() {
  * @param {Error} error - Worker execution error.
  * @returns {Promise<void>}
  */
-async function HandleWorkerFailure(error) {
+async function HandleWorkerFailure(error, port = parentPort) {
   // *************** Report failure details to the parent so the main process can persist the error log
-  parentPort.postMessage({
+  port.postMessage({
     status: 'error',
     code: error.code || 'GRADE_AGGREGATOR_WORKER_FAILED',
     message: error.message || 'Grade aggregator worker failed',
@@ -458,11 +678,33 @@ async function HandleWorkerFailure(error) {
 }
 
 // *************** WORKER BOOTSTRAP ***************
-RunGradeAggregatorWorker()
-  .catch(async (error) => {
-    await HandleWorkerFailure(error);
-  })
-  .finally(async () => {
-    // *************** Close the worker-owned MongoDB connection after success or failure
-    await mongoose.disconnect();
-  });
+if (!isMainThread) {
+  RunGradeAggregatorWorker()
+    .catch(async (error) => {
+      await HandleWorkerFailure(error);
+    })
+    .finally(async () => {
+      // *************** Close the worker-owned MongoDB connection after success or failure
+      await mongoose.disconnect();
+    });
+}
+
+// *************** EXPORT MODULE ***************
+module.exports = {
+  BuildAcademicStandingBulkOperation,
+  BuildAggregationVersionKey,
+  BuildGradeVersionKey,
+  BuildScoreLookup,
+  BuildScoreLookupKey,
+  CalculateAverage,
+  CompareRuleValue,
+  EvaluateStandingStatus,
+  ExecuteAcademicStandingBulkWrite,
+  HandleWorkerFailure,
+  IsDuplicateKeyBulkWriteError,
+  LoadCurriculumHierarchy,
+  NormalizeStandingStatus,
+  ParseWorkerPayload,
+  ValidateAcademicYearHierarchy,
+  ValidateGradingRules,
+};

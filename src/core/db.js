@@ -8,12 +8,13 @@ const applicationConfig = require('./config');
 // *************** IMPORT HELPER FUNCTION ***************
 /**
  * Establishes a connection to the MongoDB database.
+ * @param {Object} [connectionOptions={}] - Mongoose connection options for the current process.
  * @returns {Promise<void>} Resolves when the database connection is established.
  * @throws {GraphQLError} DATABASE_CONNECTION_FAILED - Failed to connect to MongoDB.
  */
-async function ConnectDatabase() {
+async function ConnectDatabase(connectionOptions = {}) {
   try {
-    await mongoose.connect(applicationConfig.db.uri);
+    await mongoose.connect(applicationConfig.db.uri, connectionOptions);
 
     console.log('MongoDB connection initialized');
   } catch (connectionError) {
