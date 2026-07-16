@@ -707,10 +707,3 @@ module.exports = {
   ValidateGradingHierarchyConfiguration,
   ValidateGradingRulesConfiguration,
 };
-
-// *************** EXPORT MODULE ***************
-module.exports = {
-  InitializeGradeAggregationIndexes,
-  SubmitTestGradesHelper,
-  ValidateGradeSubmissionAcademicYear,
-};
