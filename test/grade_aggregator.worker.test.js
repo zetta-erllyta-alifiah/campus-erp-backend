@@ -27,7 +27,10 @@ const {
 const { BlockModel, SubjectModel, TestModel } = require('../src/features/academic/curriculum/curriculum.model');
 const { AcademicYearModel } = require('../src/features/academic/enrollment/academic_year.model');
 const { ValidateGradeSubmissionAcademicYear } = require('../src/features/academic/grading/grading.helper');
+const { AcademicStandingModel } = require('../src/features/academic/grading/academic_standing.model');
+const { GradeAggregationJobModel } = require('../src/features/academic/grading/grade_aggregation_job.model');
 const { StudentGradeModel } = require('../src/features/academic/grading/student_grade.model');
+const { MAX_SUBMIT_TEST_GRADES_BATCH_SIZE, SubmitTestGradesSchema } = require('../src/features/academic/grading/grading.validator');
 
 const completeRules = [
   { label: 'Fail', operator: '<', threshold: 50 },
@@ -59,9 +62,28 @@ test('EvaluateStandingStatus passes the Day 8 test, subject, and block QA bounda
 });
 
 test('EvaluateStandingStatus supports every curriculum comparison operator', () => {
-  assert.equal(EvaluateStandingStatus(6, [{ label: 'Pass', operator: '>', threshold: 5 }]), 'Pass');
-  assert.equal(EvaluateStandingStatus(5, [{ label: 'Pass', operator: '<=', threshold: 5 }]), 'Pass');
-  assert.equal(EvaluateStandingStatus(5, [{ label: 'Pass', operator: '==', threshold: 5 }]), 'Pass');
+  assert.equal(
+    EvaluateStandingStatus(6, [
+      { label: 'Fail', operator: '<=', threshold: 5 },
+      { label: 'Pass', operator: '>', threshold: 5 },
+    ]),
+    'Pass',
+  );
+  assert.equal(
+    EvaluateStandingStatus(5, [
+      { label: 'Pass', operator: '<=', threshold: 5 },
+      { label: 'Fail', operator: '>', threshold: 5 },
+    ]),
+    'Pass',
+  );
+  assert.equal(
+    EvaluateStandingStatus(5, [
+      { label: 'Fail', operator: '<', threshold: 5 },
+      { label: 'Pass', operator: '==', threshold: 5 },
+      { label: 'Retake', operator: '>', threshold: 5 },
+    ]),
+    'Pass',
+  );
 });
 
 test('EvaluateStandingStatus rejects missing, invalid, and incomplete grading rules', () => {
@@ -71,6 +93,39 @@ test('EvaluateStandingStatus rejects missing, invalid, and incomplete grading ru
   assert.throws(() => EvaluateStandingStatus(45, [{ label: 'Pass', operator: '>=', threshold: 70 }]), /No grading rule matched/);
   assert.throws(() => EvaluateStandingStatus(80, [{ label: 'Pass', operator: '>=', threshold: null }]), /Invalid grading rule/);
   assert.throws(() => EvaluateStandingStatus(Number.NaN, completeRules), /Invalid grading value/);
+  assert.throws(
+    () =>
+      EvaluateStandingStatus(80, [
+        { label: 'Fail', operator: '<', threshold: 50 },
+        { label: 'Pass', operator: '>=', threshold: 70 },
+      ]),
+    /Grading rule ranges are incomplete/,
+  );
+  assert.throws(
+    () =>
+      EvaluateStandingStatus(80, [
+        { label: 'Fail', operator: '<', threshold: 5.2 },
+        { label: 'Pass', operator: '>=', threshold: 5.8 },
+      ]),
+    /Grading rule ranges are incomplete/,
+  );
+  assert.throws(
+    () =>
+      EvaluateStandingStatus(80, [
+        { label: 'Fail', operator: '<', threshold: 50 },
+        { label: 'Pass', operator: '>=', threshold: 50 },
+        { label: 'Retake', operator: '>=', threshold: 50 },
+      ]),
+    /Grading rule ranges overlap/,
+  );
+  assert.throws(
+    () =>
+      EvaluateStandingStatus(60, [
+        { label: 'Fail', operator: '<=', threshold: 80 },
+        { label: 'Pass', operator: '>=', threshold: 50 },
+      ]),
+    /Grading rule ranges overlap/,
+  );
 });
 
 test('CalculateAverage uses weightage when available and arithmetic fallback otherwise', () => {
@@ -100,29 +155,19 @@ test('CalculateAverage uses weightage when available and arithmetic fallback oth
   );
 });
 
-test('ParseWorkerPayload validates and deduplicates the stringified ID payload', () => {
-  const studentId = new mongoose.Types.ObjectId().toString();
+test('ParseWorkerPayload validates the stringified durable job payload', () => {
+  const jobId = new mongoose.Types.ObjectId().toString();
   const parsedPayload = ParseWorkerPayload(
     JSON.stringify({
-      student_ids: [studentId, studentId],
-      test_id: new mongoose.Types.ObjectId().toString(),
-      academic_year_id: new mongoose.Types.ObjectId().toString(),
+      job_id: jobId,
     }),
   );
 
-  assert.deepEqual(parsedPayload.student_ids, [studentId]);
+  assert.equal(parsedPayload.job_id, jobId);
   assert.throws(() => ParseWorkerPayload('{invalid'), /Invalid grade aggregator payload/);
   assert.throws(
-    () => ParseWorkerPayload(JSON.stringify({ student_ids: [] })),
-    /Student ids are required/,
-  );
-  assert.throws(
-    () => ParseWorkerPayload(JSON.stringify({ student_ids: [studentId] })),
-    /Test id is required/,
-  );
-  assert.throws(
-    () => ParseWorkerPayload(JSON.stringify({ student_ids: [studentId], test_id: 'test-1' })),
-    /Academic year id is required/,
+    () => ParseWorkerPayload(JSON.stringify({})),
+    /Grade aggregation job id is required/,
   );
 });
 
@@ -185,6 +230,37 @@ test('BuildAcademicStandingBulkOperation requires a grade snapshot version', () 
     () => BuildAcademicStandingBulkOperation('64b000000000000000000001', '64b000000000000000000002', { block: {}, subjects: [], tests: [] }, new Map()),
     /Grade aggregation version is required/,
   );
+});
+
+test('BuildAcademicStandingBulkOperation marks incomplete hierarchy as Pending', () => {
+  const studentId = new mongoose.Types.ObjectId().toString();
+  const academicYearId = new mongoose.Types.ObjectId().toString();
+  const blockId = new mongoose.Types.ObjectId();
+  const subjectId = new mongoose.Types.ObjectId();
+  const gradedTestId = new mongoose.Types.ObjectId();
+  const missingTestId = new mongoose.Types.ObjectId();
+  const scoreLookup = new Map([[BuildScoreLookupKey(studentId, gradedTestId), 80]]);
+
+  const operation = BuildAcademicStandingBulkOperation(
+    studentId,
+    academicYearId,
+    {
+      block: { _id: blockId, grading_rules: completeRules },
+      subjects: [{ _id: subjectId, weightage: 100, grading_rules: completeRules }],
+      tests: [
+        { _id: gradedTestId, subject_id: subjectId, weightage: 50, grading_rules: completeRules },
+        { _id: missingTestId, subject_id: subjectId, weightage: 50, grading_rules: completeRules },
+      ],
+    },
+    scoreLookup,
+    '2026-07-15T01:02:03.004Z|64b000000000000000000001|000000000001',
+  );
+
+  const setStage = operation.updateOne.update[0].$set;
+  assert.equal(setStage.block_status.$cond[1], 'Pending');
+  assert.equal(setStage.subjects.$cond[1][0].subject_status, 'Pending');
+  assert.equal(setStage.subjects.$cond[1][0].tests[1].test_status, 'Pending');
+  assert.equal(setStage.subjects.$cond[1][0].tests[1].is_graded, false);
 });
 
 test('bulk operations target each submitted student with an isolated score snapshot', () => {
@@ -485,6 +561,32 @@ test('curriculum indexes support the worker filter and sort order', () => {
   );
 });
 
+test('academic standing and job schemas support pending status and worker locking', () => {
+  assert.equal(AcademicStandingModel.schema.path('block_status').enumValues.includes('Pending'), true);
+
+  const jobIndexes = GradeAggregationJobModel.schema.indexes();
+  assert.equal(
+    jobIndexes.some(([fields, options]) => fields.lock_key === 1 && fields.status === 1 && options.partialFilterExpression?.status === 'running'),
+    true,
+  );
+});
+
+test('SubmitTestGradesSchema caps grade batch size', () => {
+  const validObjectId = new mongoose.Types.ObjectId().toString();
+  const grades = Array.from({ length: MAX_SUBMIT_TEST_GRADES_BATCH_SIZE + 1 }, () => ({
+    student_id: validObjectId,
+    score: 80,
+  }));
+
+  const { error } = SubmitTestGradesSchema.validate({
+    academic_year_id: validObjectId,
+    test_id: validObjectId,
+    grades,
+  });
+
+  assert.match(error.message, /must contain less than or equal to 100 items/);
+});
+
 test('HandleWorkerFailure reports structured worker errors to the parent port', async () => {
   const messages = [];
   const fakePort = {
@@ -506,6 +608,8 @@ test('HandleWorkerFailure reports structured worker errors to the parent port', 
       status: 'error',
       code: 'GRADE_AGGREGATOR_TEST_ERROR',
       message: 'worker test failure',
+      job_id: null,
+      next_run_at: null,
     },
   ]);
 });

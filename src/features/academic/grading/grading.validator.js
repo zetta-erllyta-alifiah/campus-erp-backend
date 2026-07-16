@@ -6,6 +6,10 @@ const { ObjectIdValidator } = require('../../../shared/validators/validator');
 
 // *************** VALIDATION SCHEMA ***************
 
+// Maximum grade rows accepted by one mutation before the caller must split
+// a larger cohort into smaller controlled batches.
+const MAX_SUBMIT_TEST_GRADES_BATCH_SIZE = 100;
+
 /**
  * Validation schema for submitting
  * a test grade batch.
@@ -21,10 +25,12 @@ const SubmitTestGradesSchema = Joi.object({
       }),
     )
     .min(1)
+    .max(MAX_SUBMIT_TEST_GRADES_BATCH_SIZE)
     .required(),
 });
 
 // *************** EXPORT MODULE ***************
 module.exports = {
+  MAX_SUBMIT_TEST_GRADES_BATCH_SIZE,
   SubmitTestGradesSchema,
 };

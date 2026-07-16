@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 // *************** GLOBAL VARIABLES ***************
 
 // Allowed standing statuses produced by the grade aggregation worker.
-const ACADEMIC_STANDING_STATUSES = ['Pass', 'Fail', 'Retake'];
+const ACADEMIC_STANDING_STATUSES = ['Pass', 'Fail', 'Retake', 'Pending'];
 
 /**
  * Academic standing test snapshot schema.

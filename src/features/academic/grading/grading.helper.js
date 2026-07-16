@@ -12,6 +12,9 @@
 const path = require('path');
 const { Worker } = require('worker_threads');
 
+// *************** IMPORT LIBRARY ***************
+const mongoose = require('mongoose');
+
 // *************** IMPORT MODULE ***************
 const { AppError, LogAndNormalizeGqlError } = require('../../../core/errors');
 const { BlockModel, SubjectModel, TestModel } = require('../curriculum/curriculum.model');
@@ -19,6 +22,8 @@ const { AcademicYearModel } = require('../enrollment/academic_year.model');
 const { StudentModel } = require('../../users/student/student.model');
 const { StudentGradeModel } = require('./student_grade.model');
 const { AcademicStandingModel } = require('./academic_standing.model');
+const { GradeAggregationJobModel } = require('./grade_aggregation_job.model');
+const { BuildGradeAggregationLockKey } = require('./grade_aggregation.helper');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -31,6 +36,10 @@ const GRADE_AGGREGATOR_WORKER_PATH = path.resolve(__dirname, '../../../workers/g
 
 // Error log source used for worker lifecycle failures observed by the main thread.
 const GRADE_AGGREGATOR_HELPER_SOURCE = 'src/features/academic/grading/grading.helper.js';
+const MAX_CONCURRENT_GRADE_AGGREGATION_WORKERS = 2;
+
+let activeGradeAggregationWorkerCount = 0;
+const pendingGradeAggregationJobIds = [];
 
 // *************** HELPER FUNCTION ***************
 
@@ -74,27 +83,50 @@ function ValidateGradeSubmissionAcademicYear(existingSubject, existingAcademicYe
  * @returns {Promise<void>}
  */
 async function InitializeGradeAggregationIndexes() {
-  await Promise.all([AcademicStandingModel.init(), SubjectModel.init(), TestModel.init()]);
+  await Promise.all([AcademicStandingModel.init(), GradeAggregationJobModel.init(), SubjectModel.init(), TestModel.init()]);
+}
+
+function SchedulePendingGradeAggregationWorkers() {
+  while (
+    activeGradeAggregationWorkerCount < MAX_CONCURRENT_GRADE_AGGREGATION_WORKERS &&
+    pendingGradeAggregationJobIds.length > 0
+  ) {
+    const jobId = pendingGradeAggregationJobIds.shift();
+    SpawnGradeAggregatorWorker(jobId);
+  }
+}
+
+function QueueGradeAggregatorWorker(jobId, delayMs = 0) {
+  if (delayMs > 0) {
+    setTimeout(() => {
+      QueueGradeAggregatorWorker(jobId);
+    }, delayMs);
+    return;
+  }
+
+  pendingGradeAggregationJobIds.push(String(jobId));
+  SchedulePendingGradeAggregationWorkers();
+}
+
+function ReleaseGradeAggregatorWorkerSlot() {
+  activeGradeAggregationWorkerCount = Math.max(activeGradeAggregationWorkerCount - 1, 0);
+  SchedulePendingGradeAggregationWorkers();
 }
 
 /**
  * Spawns the grade aggregation worker in a non-blocking flow.
  *
- * Only stringified identifiers are passed into workerData. This avoids
- * structured clone issues and satisfies the Day 8 mandate to never pass
- * Mongoose documents or model instances into a worker thread.
+ * Only the stable durable job id is passed into workerData. This avoids
+ * structured clone issues and lets retry/resume logic reload the same job.
  *
- * @param {Object} input - Validated grade submission input.
- * @param {string[]} studentIds - Student IDs included in the submitted batch.
+ * @param {string} jobId - Durable grade aggregation job identifier.
  * @returns {void}
  */
-function SpawnGradeAggregatorWorker(input, studentIds) {
+function SpawnGradeAggregatorWorker(jobId) {
   // *************** START: Build worker payload ***************
   // *************** Send only serializable IDs to satisfy the worker stringification mandate
   const payload = JSON.stringify({
-    student_ids: studentIds,
-    test_id: input.test_id,
-    academic_year_id: input.academic_year_id,
+    job_id: String(jobId),
   });
   // *************** END: Build worker payload ***************
 
@@ -103,10 +135,12 @@ function SpawnGradeAggregatorWorker(input, studentIds) {
   let worker;
 
   try {
+    activeGradeAggregationWorkerCount += 1;
     worker = new Worker(GRADE_AGGREGATOR_WORKER_PATH, {
       workerData: payload,
     });
   } catch (workerBootstrapError) {
+    ReleaseGradeAggregatorWorkerSlot();
     // *************** Log worker bootstrap failures without failing the already-committed grade mutation
     LogGradeAggregatorWorkerError(
       new AppError(
@@ -114,9 +148,7 @@ function SpawnGradeAggregatorWorker(input, studentIds) {
         workerBootstrapError.httpStatus || 500,
         workerBootstrapError.message || 'Grade aggregator worker bootstrap failed',
         {
-          test_id: input.test_id,
-          academic_year_id: input.academic_year_id,
-          student_ids: studentIds,
+          job_id: String(jobId),
         },
       ),
     );
@@ -134,12 +166,15 @@ function SpawnGradeAggregatorWorker(input, studentIds) {
           500,
           message.message || 'Grade aggregator worker failed',
           {
-            test_id: input.test_id,
-            academic_year_id: input.academic_year_id,
-            student_ids: studentIds,
+            job_id: String(jobId),
           },
         ),
       );
+
+      if (message.next_run_at) {
+        const delayMs = Math.max(new Date(message.next_run_at).getTime() - Date.now(), 0);
+        QueueGradeAggregatorWorker(jobId, delayMs);
+      }
     }
   });
 
@@ -151,9 +186,7 @@ function SpawnGradeAggregatorWorker(input, studentIds) {
         workerError.httpStatus || 500,
         workerError.message || 'Grade aggregator worker failed',
         {
-          test_id: input.test_id,
-          academic_year_id: input.academic_year_id,
-          student_ids: studentIds,
+          job_id: String(jobId),
         },
       ),
     );
@@ -168,16 +201,73 @@ function SpawnGradeAggregatorWorker(input, studentIds) {
           500,
           `Grade aggregator worker exited with code ${exitCode}`,
           {
-            test_id: input.test_id,
-            academic_year_id: input.academic_year_id,
-            student_ids: studentIds,
+            job_id: String(jobId),
             exit_code: exitCode,
           },
         ),
       );
     }
+
+    ReleaseGradeAggregatorWorkerSlot();
   });
   // *************** END: Register worker lifecycle listeners ***************
+}
+
+async function ResumePendingGradeAggregationJobs() {
+  const dueJobs = await GradeAggregationJobModel.find({
+    status: {
+      $in: ['queued', 'retry'],
+    },
+    next_run_at: {
+      $lte: new Date(),
+    },
+  })
+    .select('_id')
+    .sort({ next_run_at: 1, created_at: 1 })
+    .limit(MAX_CONCURRENT_GRADE_AGGREGATION_WORKERS)
+    .lean();
+
+  dueJobs.forEach((job) => QueueGradeAggregatorWorker(job._id));
+}
+
+async function InsertGradesAndCreateAggregationJob(mappedGrades, validatedInput, studentIds, blockId) {
+  const session = await mongoose.startSession();
+  const jobId = new mongoose.Types.ObjectId();
+  let insertedGrades = [];
+
+  try {
+    await session.withTransaction(async () => {
+      insertedGrades = await StudentGradeModel.insertMany(mappedGrades, {
+        ordered: true,
+        session,
+      });
+
+      await GradeAggregationJobModel.create(
+        [
+          {
+            _id: jobId,
+            student_ids: studentIds,
+            test_id: validatedInput.test_id,
+            academic_year_id: validatedInput.academic_year_id,
+            block_id: blockId,
+            lock_key: BuildGradeAggregationLockKey(validatedInput.academic_year_id, blockId),
+            status: 'queued',
+            next_run_at: new Date(),
+          },
+        ],
+        {
+          session,
+        },
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return {
+    insertedGrades,
+    jobId,
+  };
 }
 
 /**
@@ -281,11 +371,16 @@ async function SubmitTestGradesHelper(input) {
     score: grade.score,
   }));
 
-  const insertedGrades = await StudentGradeModel.insertMany(mappedGrades, { ordered: true });
+  const { insertedGrades, jobId } = await InsertGradesAndCreateAggregationJob(
+    mappedGrades,
+    validatedInput,
+    uniqueStudentIds,
+    matchingBlock._id,
+  );
   // *************** END: Transform and insert grade batch ***************
 
   // *************** START: Trigger non-blocking academic standing aggregation ***************
-  SpawnGradeAggregatorWorker(validatedInput, uniqueStudentIds);
+  QueueGradeAggregatorWorker(jobId);
   // *************** END: Trigger non-blocking academic standing aggregation ***************
 
   return insertedGrades;
@@ -294,6 +389,9 @@ async function SubmitTestGradesHelper(input) {
 // *************** EXPORT MODULE ***************
 module.exports = {
   InitializeGradeAggregationIndexes,
+  InsertGradesAndCreateAggregationJob,
+  QueueGradeAggregatorWorker,
+  ResumePendingGradeAggregationJobs,
   SubmitTestGradesHelper,
   ValidateGradeSubmissionAcademicYear,
 };
