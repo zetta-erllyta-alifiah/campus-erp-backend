@@ -149,29 +149,6 @@ const TestSchema = new mongoose.Schema(
   },
 );
 
-// *************** START: Support curriculum hierarchy worker lookups ***************
-SubjectSchema.index(
-  {
-    block_id: 1,
-    created_at: 1,
-    _id: 1,
-  },
-  {
-    name: 'idx_subject_block_created',
-  },
-);
-
-TestSchema.index(
-  {
-    subject_id: 1,
-    created_at: 1,
-    _id: 1,
-  },
-  {
-    name: 'idx_test_subject_created',
-  },
-);
-// *************** END: Support curriculum hierarchy worker lookups ***************
 const BlockModel = mongoose.model('Block', BlockSchema);
 const SubjectModel = mongoose.model('Subject', SubjectSchema);
 const TestModel = mongoose.model('Test', TestSchema);

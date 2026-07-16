@@ -26,6 +26,9 @@ const SubmitTestGradesSchema = Joi.object({
     )
     .min(1)
     .max(MAX_SUBMIT_TEST_GRADES_BATCH_SIZE)
+    .messages({
+      'array.max': `SubmitTestGrades accepts at most ${MAX_SUBMIT_TEST_GRADES_BATCH_SIZE} grade rows; split larger cohorts into controlled batches.`,
+    })
     .required(),
 });
 

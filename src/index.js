@@ -12,7 +12,7 @@ const { ConnectDatabase } = require('./core/db');
 const systemGraphQLModule = require('./features/system');
 const { CreateAcademicYearLoader } = require('./loaders/academic_year.loader');
 const { InitializeGradeAuditorJob } = require('./jobs/system/missing_grade_auditor.cron');
-const { InitializeGradeAggregationIndexes, ResumePendingGradeAggregationJobs } = require('./features/academic/grading/grading.helper');
+const { InitializeGradeAggregationIndexes } = require('./features/academic/grading/grading.helper');
 
 const curriculumModule = require('./features/academic/curriculum');
 const studentModule = require('./features/users/student');
@@ -70,9 +70,8 @@ async function InitializeApplication() {
     // *************** Initialize database connection ***************
     await ConnectDatabase();
 
-    // *************** Initialize grading indexes before background workers run ***************
+    // *************** Initialize grading indexes once during application startup ***************
     await InitializeGradeAggregationIndexes();
-    await ResumePendingGradeAggregationJobs();
 
     // *************** Initialize background jobs after database is ready ***************
     await InitializeGradeAuditorJob();

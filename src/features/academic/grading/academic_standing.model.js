@@ -78,6 +78,13 @@ const AcademicStandingSubjectSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Indicates whether all required tests under this subject have submitted grades.
+    is_complete: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+
     // Computed standings for the tests that belong to this subject.
     tests: {
       type: [AcademicStandingTestSchema],
@@ -134,17 +141,11 @@ const AcademicStandingSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Monotonic grade snapshot key used to prevent stale worker writes.
-    aggregation_version_key: {
-      type: String,
-      default: null,
-      trim: true,
-    },
-
-    // Timestamp component of the grade snapshot version for operational inspection.
-    aggregation_version_at: {
-      type: Date,
-      default: null,
+    // Indicates whether all required subjects and tests under this block are complete.
+    is_complete: {
+      type: Boolean,
+      required: true,
+      default: false,
     },
 
     // Computed standings for the subjects that belong to this block.

@@ -8,22 +8,14 @@
  * - Keep the GraphQL response non-blocking while the worker aggregates standings.
  */
 
-// *************** IMPORT CORE ***************
-const path = require('path');
-const { Worker } = require('worker_threads');
-
-// *************** IMPORT LIBRARY ***************
-const mongoose = require('mongoose');
-
 // *************** IMPORT MODULE ***************
-const { AppError, LogAndNormalizeGqlError } = require('../../../core/errors');
+const { AppError } = require('../../../core/errors');
 const { BlockModel, SubjectModel, TestModel } = require('../curriculum/curriculum.model');
 const { AcademicYearModel } = require('../enrollment/academic_year.model');
 const { StudentModel } = require('../../users/student/student.model');
 const { StudentGradeModel } = require('./student_grade.model');
 const { AcademicStandingModel } = require('./academic_standing.model');
-const { GradeAggregationJobModel } = require('./grade_aggregation_job.model');
-const { BuildGradeAggregationLockKey } = require('./grade_aggregation.helper');
+const { SpawnGradeAggregatorWorker } = require('../../../workers/grade_aggregator.helper');
 
 // *************** IMPORT VALIDATOR ***************
 const { ValidateInputWithJoi } = require('../../../shared/validators/validator');
@@ -31,33 +23,537 @@ const { SubmitTestGradesSchema } = require('./grading.validator');
 
 // *************** GLOBAL VARIABLES ***************
 
-// Absolute path to the grade aggregation worker entry file.
-const GRADE_AGGREGATOR_WORKER_PATH = path.resolve(__dirname, '../../../workers/grade_aggregator.worker.js');
+// System status used while at least one required grade is missing.
+const PENDING_STANDING_STATUS = 'Pending';
 
-// Error log source used for worker lifecycle failures observed by the main thread.
-const GRADE_AGGREGATOR_HELPER_SOURCE = 'src/features/academic/grading/grading.helper.js';
-const MAX_CONCURRENT_GRADE_AGGREGATION_WORKERS = 2;
+// Dynamic grading rule labels supported by the AcademicStanding schema.
+const STANDING_STATUS_BY_LABEL = {
+  pass: 'Pass',
+  fail: 'Fail',
+  retake: 'Retake',
+};
 
-let activeGradeAggregationWorkerCount = 0;
-const pendingGradeAggregationJobIds = [];
+// Operators supported by curriculum grading rules.
+const SUPPORTED_GRADING_RULE_OPERATORS = ['>', '>=', '<', '<=', '=='];
+
+// Grade aggregation evaluates submitted scores and averages on the institutional 0-100 scale.
+const MINIMUM_GRADING_RULE_VALUE = 0;
+const MAXIMUM_GRADING_RULE_VALUE = 100;
 
 // *************** HELPER FUNCTION ***************
 
 /**
- * Logs grade aggregation worker lifecycle failures without blocking
- * the grade submission response.
+ * Compares a numeric value against one dynamic grading rule.
  *
- * The worker runs outside the GraphQL resolver call stack, so failures are
- * reported here through the shared error logger instead of being thrown back
- * to the client after the grade submission has already succeeded.
+ * @param {number} value - Numeric value being evaluated.
+ * @param {string} operator - Dynamic rule operator.
+ * @param {number} threshold - Dynamic rule threshold.
+ * @returns {boolean} Whether the rule matches.
+ */
+function CompareRuleValue(value, operator, threshold) {
+  switch (operator) {
+    case '>':
+      return value > threshold;
+    case '>=':
+      return value >= threshold;
+    case '<':
+      return value < threshold;
+    case '<=':
+      return value <= threshold;
+    case '==':
+      return value === threshold;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Builds a priority score for a matching rule.
  *
- * @param {Error} error - Worker lifecycle error.
+ * Lower-bound rules intentionally form a threshold chain. For example,
+ * ">= 5 Retake" and ">= 6 Pass" means values from 5 to below 6 are Retake,
+ * while values 6 and above are Pass.
+ *
+ * @param {Object} rule - Matching grading rule.
+ * @returns {number[]} Sortable priority tuple.
+ */
+function BuildRulePriority(rule) {
+  if (rule.operator === '==') {
+    return [3, 0];
+  }
+
+  if (rule.operator === '>' || rule.operator === '>=') {
+    return [2, Number(rule.threshold)];
+  }
+
+  if (rule.operator === '<' || rule.operator === '<=') {
+    return [1, Number(rule.threshold) * -1];
+  }
+
+  return [0, 0];
+}
+
+/**
+ * Normalizes a dynamic grading rule label to AcademicStanding enum casing.
+ *
+ * @param {string} label - Rule label from curriculum configuration.
+ * @param {Object} context - Curriculum context for error metadata.
+ * @returns {string} Academic standing enum value.
+ * @throws {AppError} When the label is unsupported.
+ */
+function NormalizeStandingStatus(label, context = {}) {
+  const normalizedStatus = STANDING_STATUS_BY_LABEL[String(label || '').trim().toLowerCase()];
+
+  if (!normalizedStatus) {
+    throw new AppError('GRADING_RULE_STATUS_UNSUPPORTED', 500, 'Unsupported grading rule status label', {
+      ...context,
+      label,
+    });
+  }
+
+  return normalizedStatus;
+}
+
+/**
+ * Throws a structured grading rule configuration error.
+ *
+ * @param {string} code - Stable error code.
+ * @param {string} message - Error message.
+ * @param {Object} context - Error metadata.
+ * @returns {never}
+ */
+function ThrowGradingRuleConfigurationError(code, message, context) {
+  throw new AppError(code, 500, message, context);
+}
+
+/**
+ * Validates the low boundary between upper-bound and lower-bound rule groups.
+ *
+ * @param {Object|null} upperRule - Rule covering values below the first threshold.
+ * @param {Object|null} firstLowerRule - First lower-bound rule.
+ * @param {Set<string>} exactThresholdSet - Exact thresholds configured with ==.
+ * @param {Object} context - Curriculum context for error metadata.
  * @returns {void}
  */
-function LogGradeAggregatorWorkerError(error) {
-  LogAndNormalizeGqlError(error, {
-    source: GRADE_AGGREGATOR_HELPER_SOURCE,
+function ValidateGradingRuleBoundary(upperRule, firstLowerRule, exactThresholdSet, context) {
+  if (!upperRule || !firstLowerRule) {
+    ThrowGradingRuleConfigurationError(
+      'GRADING_RULE_RANGE_INCOMPLETE',
+      'Grading rule ranges must cover the full 0-100 score range',
+      context,
+    );
+  }
+
+  const upperThreshold = Number(upperRule.threshold);
+  const lowerThreshold = Number(firstLowerRule.threshold);
+
+  if (upperThreshold > lowerThreshold) {
+    ThrowGradingRuleConfigurationError(
+      'GRADING_RULE_RANGE_OVERLAP',
+      'Grading rule ranges overlap',
+      {
+        ...context,
+        upper_rule: upperRule,
+        lower_rule: firstLowerRule,
+      },
+    );
+  }
+
+  if (upperThreshold < lowerThreshold) {
+    ThrowGradingRuleConfigurationError(
+      'GRADING_RULE_RANGE_INCOMPLETE',
+      'Grading rule ranges leave an uncovered score range',
+      {
+        ...context,
+        upper_rule: upperRule,
+        lower_rule: firstLowerRule,
+      },
+    );
+  }
+
+  const upperIncludesBoundary = upperRule.operator === '<=';
+  const lowerIncludesBoundary = firstLowerRule.operator === '>=';
+
+  if (upperIncludesBoundary && lowerIncludesBoundary) {
+    ThrowGradingRuleConfigurationError(
+      'GRADING_RULE_RANGE_OVERLAP',
+      'Grading rule ranges overlap at the boundary threshold',
+      {
+        ...context,
+        upper_rule: upperRule,
+        lower_rule: firstLowerRule,
+      },
+    );
+  }
+
+  if (!upperIncludesBoundary && !lowerIncludesBoundary && !exactThresholdSet.has(String(upperThreshold))) {
+    ThrowGradingRuleConfigurationError(
+      'GRADING_RULE_RANGE_INCOMPLETE',
+      'Grading rule ranges leave the boundary threshold uncovered',
+      {
+        ...context,
+        boundary_threshold: upperThreshold,
+      },
+    );
+  }
+}
+
+/**
+ * Validates a curriculum grading rule set before any standing is computed.
+ *
+ * Empty rules, unsupported labels, duplicate thresholds, obvious overlaps,
+ * and incomplete 0-100 coverage are treated as configuration errors instead
+ * of silently failing students.
+ *
+ * @param {Array} gradingRules - Dynamic grading rules from curriculum.
+ * @param {Object} context - Curriculum context for error metadata.
+ * @returns {void}
+ * @throws {AppError} When rules are misconfigured.
+ */
+function ValidateGradingRulesConfiguration(gradingRules, context = {}) {
+  if (!Array.isArray(gradingRules) || gradingRules.length === 0) {
+    ThrowGradingRuleConfigurationError('GRADING_RULES_EMPTY', 'Grading rules must not be empty', context);
+  }
+
+  const upperBoundRules = [];
+  const lowerBoundRules = [];
+  const exactRules = [];
+  const exactThresholdSet = new Set();
+  const ruleKeySet = new Set();
+
+  for (const rule of gradingRules) {
+    const threshold = Number(rule.threshold);
+
+    if (!SUPPORTED_GRADING_RULE_OPERATORS.includes(rule.operator) || !Number.isFinite(threshold)) {
+      ThrowGradingRuleConfigurationError('GRADING_RULE_INVALID', 'Grading rule operator or threshold is invalid', {
+        ...context,
+        rule,
+      });
+    }
+
+    if (threshold < MINIMUM_GRADING_RULE_VALUE || threshold > MAXIMUM_GRADING_RULE_VALUE) {
+      ThrowGradingRuleConfigurationError(
+        'GRADING_RULE_THRESHOLD_OUT_OF_RANGE',
+        'Grading rule threshold must be within the 0-100 score range',
+        {
+          ...context,
+          rule,
+        },
+      );
+    }
+
+    NormalizeStandingStatus(rule.label, {
+      ...context,
+      rule,
+    });
+
+    const ruleKey = `${rule.operator}:${threshold}`;
+
+    if (ruleKeySet.has(ruleKey)) {
+      ThrowGradingRuleConfigurationError('GRADING_RULE_RANGE_OVERLAP', 'Duplicate grading rule range found', {
+        ...context,
+        rule,
+      });
+    }
+
+    ruleKeySet.add(ruleKey);
+
+    if (rule.operator === '<' || rule.operator === '<=') {
+      upperBoundRules.push(rule);
+    } else if (rule.operator === '>' || rule.operator === '>=') {
+      lowerBoundRules.push(rule);
+    } else {
+      exactRules.push(rule);
+      exactThresholdSet.add(String(threshold));
+    }
+  }
+
+  if (upperBoundRules.length > 1) {
+    ThrowGradingRuleConfigurationError(
+      'GRADING_RULE_RANGE_OVERLAP',
+      'Multiple upper-bound grading rules create overlapping score ranges',
+      {
+        ...context,
+        rules: upperBoundRules,
+      },
+    );
+  }
+
+  lowerBoundRules.sort((leftRule, rightRule) => Number(leftRule.threshold) - Number(rightRule.threshold));
+
+  for (let ruleIndex = 1; ruleIndex < lowerBoundRules.length; ruleIndex += 1) {
+    if (Number(lowerBoundRules[ruleIndex - 1].threshold) === Number(lowerBoundRules[ruleIndex].threshold)) {
+      ThrowGradingRuleConfigurationError(
+        'GRADING_RULE_RANGE_OVERLAP',
+        'Lower-bound grading rules overlap at the same threshold',
+        {
+          ...context,
+          previous_rule: lowerBoundRules[ruleIndex - 1],
+          current_rule: lowerBoundRules[ruleIndex],
+        },
+      );
+    }
+  }
+
+  for (const exactRule of exactRules) {
+    const exactThreshold = Number(exactRule.threshold);
+    const exactOverlapsUpper = upperBoundRules.some((rule) => CompareRuleValue(exactThreshold, rule.operator, rule.threshold));
+    const exactOverlapsLower = lowerBoundRules.some((rule) => CompareRuleValue(exactThreshold, rule.operator, rule.threshold));
+
+    if (exactOverlapsUpper || exactOverlapsLower) {
+      ThrowGradingRuleConfigurationError(
+        'GRADING_RULE_RANGE_OVERLAP',
+        'Exact grading rule overlaps another score range',
+        {
+          ...context,
+          exact_rule: exactRule,
+        },
+      );
+    }
+  }
+
+  ValidateGradingRuleBoundary(upperBoundRules[0] || null, lowerBoundRules[0] || null, exactThresholdSet, context);
+}
+
+/**
+ * Validates every grading rule set used by one loaded block hierarchy.
+ *
+ * @param {Object} hierarchy - Loaded block, subject, and test hierarchy.
+ * @returns {void}
+ */
+function ValidateGradingHierarchyConfiguration(hierarchy) {
+  ValidateGradingRulesConfiguration(hierarchy.block?.grading_rules, {
+    level: 'block',
+    block_id: hierarchy.block?._id?.toString(),
   });
+
+  for (const subject of hierarchy.subjects || []) {
+    ValidateGradingRulesConfiguration(subject.grading_rules, {
+      level: 'subject',
+      subject_id: subject._id?.toString(),
+    });
+  }
+
+  for (const test of hierarchy.tests || []) {
+    ValidateGradingRulesConfiguration(test.grading_rules, {
+      level: 'test',
+      test_id: test._id?.toString(),
+    });
+  }
+}
+
+/**
+ * Evaluates a score or average against dynamic grading rules.
+ *
+ * @param {number} value - Score or average to evaluate.
+ * @param {Array} gradingRules - Dynamic grading rules from curriculum.
+ * @param {Object} context - Curriculum context for error metadata.
+ * @param {Object} options - Evaluation options.
+ * @returns {string} Computed standing status.
+ */
+function EvaluateStandingStatus(value, gradingRules, context = {}, options = {}) {
+  if (!options.skipRuleValidation) {
+    ValidateGradingRulesConfiguration(gradingRules, context);
+  }
+
+  const numericValue = Number(value);
+  const matchingRules = gradingRules.filter((rule) => {
+    return CompareRuleValue(numericValue, rule.operator, Number(rule.threshold));
+  });
+
+  if (matchingRules.length === 0) {
+    throw new AppError('GRADING_RULE_NO_MATCH', 500, 'No grading rule matches the computed value', {
+      ...context,
+      value: numericValue,
+    });
+  }
+
+  matchingRules.sort((leftRule, rightRule) => {
+    const leftPriority = BuildRulePriority(leftRule);
+    const rightPriority = BuildRulePriority(rightRule);
+
+    if (rightPriority[0] !== leftPriority[0]) {
+      return rightPriority[0] - leftPriority[0];
+    }
+
+    return rightPriority[1] - leftPriority[1];
+  });
+
+  return NormalizeStandingStatus(matchingRules[0].label, {
+    ...context,
+    rule: matchingRules[0],
+  });
+}
+
+/**
+ * Rounds a computed mark to two decimal places.
+ *
+ * @param {number} value - Raw computed value.
+ * @returns {number} Rounded value.
+ */
+function RoundMark(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+/**
+ * Calculates a weighted average and falls back to an arithmetic average
+ * when child weightage is unavailable.
+ *
+ * @param {Array} items - Child items to aggregate.
+ * @param {string} valueKey - Numeric value key on each child item.
+ * @param {string} weightageKey - Weightage key on each child item.
+ * @returns {number} Computed average.
+ */
+function CalculateAverage(items, valueKey, weightageKey) {
+  if (!items.length) {
+    return 0;
+  }
+
+  const totalWeightage = items.reduce((total, item) => {
+    return total + Math.max(Number(item[weightageKey] || 0), 0);
+  }, 0);
+
+  if (totalWeightage > 0) {
+    const weightedAverage = items.reduce((total, item) => {
+      return total + (Number(item[valueKey] || 0) * Math.max(Number(item[weightageKey] || 0), 0)) / totalWeightage;
+    }, 0);
+
+    return RoundMark(weightedAverage);
+  }
+
+  const arithmeticAverage = items.reduce((total, item) => total + Number(item[valueKey] || 0), 0) / items.length;
+
+  return RoundMark(arithmeticAverage);
+}
+
+/**
+ * Builds a stable score lookup key.
+ *
+ * @param {Object|string} studentId - Student identifier.
+ * @param {Object|string} testId - Test identifier.
+ * @returns {string} Lookup key.
+ */
+function BuildScoreLookupKey(studentId, testId) {
+  return `${studentId.toString()}:${testId.toString()}`;
+}
+
+/**
+ * Builds an AcademicStanding bulkWrite operation for one student.
+ *
+ * Missing grades keep their test snapshot with total_mark 0 and Pending
+ * status. Any subject with at least one missing required test stays Pending,
+ * and the block stays Pending until every required subject test is graded.
+ *
+ * @param {string} studentId - Student identifier.
+ * @param {string} academicYearId - Academic year identifier.
+ * @param {Object} hierarchy - Loaded block hierarchy.
+ * @param {Map} scoreLookup - Student/test score lookup map.
+ * @param {Object} options - Build options.
+ * @returns {Object} bulkWrite updateOne operation.
+ */
+function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy, scoreLookup, options = {}) {
+  if (!options.skipHierarchyValidation) {
+    ValidateGradingHierarchyConfiguration(hierarchy);
+  }
+
+  const evaluationOptions = {
+    skipRuleValidation: true,
+  };
+
+  const testsBySubjectId = new Map();
+
+  for (const test of hierarchy.tests) {
+    const subjectId = test.subject_id.toString();
+
+    if (!testsBySubjectId.has(subjectId)) {
+      testsBySubjectId.set(subjectId, []);
+    }
+
+    testsBySubjectId.get(subjectId).push(test);
+  }
+
+  const subjects = hierarchy.subjects.map((subject) => {
+    const subjectTests = testsBySubjectId.get(subject._id.toString()) || [];
+    const computedTests = subjectTests.map((test) => {
+      const scoreLookupKey = BuildScoreLookupKey(studentId, test._id);
+      const isGraded = scoreLookup.has(scoreLookupKey);
+      const totalMark = isGraded ? RoundMark(scoreLookup.get(scoreLookupKey)) : 0;
+
+      return {
+        test_id: test._id,
+        weightage: test.weightage,
+        total_mark: totalMark,
+        test_status: isGraded
+          ? EvaluateStandingStatus(totalMark, test.grading_rules, {
+              level: 'test',
+              test_id: test._id?.toString(),
+              student_id: studentId,
+            }, evaluationOptions)
+          : PENDING_STANDING_STATUS,
+        is_graded: isGraded,
+      };
+    });
+
+    const subjectAverage = CalculateAverage(computedTests, 'total_mark', 'weightage');
+    const isSubjectComplete = computedTests.length > 0 && computedTests.every((test) => test.is_graded);
+
+    return {
+      subject_id: subject._id,
+      weightage: subject.weightage,
+      subject_average: subjectAverage,
+      subject_status: isSubjectComplete
+        ? EvaluateStandingStatus(subjectAverage, subject.grading_rules, {
+            level: 'subject',
+            subject_id: subject._id?.toString(),
+            student_id: studentId,
+          }, evaluationOptions)
+        : PENDING_STANDING_STATUS,
+      is_complete: isSubjectComplete,
+      tests: computedTests.map((test) => ({
+        test_id: test.test_id,
+        total_mark: test.total_mark,
+        test_status: test.test_status,
+        is_graded: test.is_graded,
+      })),
+    };
+  });
+
+  const blockAverage = CalculateAverage(subjects, 'subject_average', 'weightage');
+  const isBlockComplete = subjects.length > 0 && subjects.every((subject) => subject.is_complete);
+
+  return {
+    updateOne: {
+      filter: {
+        student_id: studentId,
+        academic_year_id: academicYearId,
+        block_id: hierarchy.block._id,
+      },
+      update: {
+        $set: {
+          student_id: studentId,
+          academic_year_id: academicYearId,
+          block_id: hierarchy.block._id,
+          block_average: blockAverage,
+          block_status: isBlockComplete
+            ? EvaluateStandingStatus(blockAverage, hierarchy.block.grading_rules, {
+                level: 'block',
+                block_id: hierarchy.block._id?.toString(),
+                student_id: studentId,
+              }, evaluationOptions)
+            : PENDING_STANDING_STATUS,
+          is_complete: isBlockComplete,
+          subjects: subjects.map((subject) => ({
+            subject_id: subject.subject_id,
+            subject_average: subject.subject_average,
+            subject_status: subject.subject_status,
+            is_complete: subject.is_complete,
+            tests: subject.tests,
+          })),
+        },
+      },
+      upsert: true,
+    },
+  };
 }
 
 /**
@@ -83,191 +579,7 @@ function ValidateGradeSubmissionAcademicYear(existingSubject, existingAcademicYe
  * @returns {Promise<void>}
  */
 async function InitializeGradeAggregationIndexes() {
-  await Promise.all([AcademicStandingModel.init(), GradeAggregationJobModel.init(), SubjectModel.init(), TestModel.init()]);
-}
-
-function SchedulePendingGradeAggregationWorkers() {
-  while (
-    activeGradeAggregationWorkerCount < MAX_CONCURRENT_GRADE_AGGREGATION_WORKERS &&
-    pendingGradeAggregationJobIds.length > 0
-  ) {
-    const jobId = pendingGradeAggregationJobIds.shift();
-    SpawnGradeAggregatorWorker(jobId);
-  }
-}
-
-function QueueGradeAggregatorWorker(jobId, delayMs = 0) {
-  if (delayMs > 0) {
-    setTimeout(() => {
-      QueueGradeAggregatorWorker(jobId);
-    }, delayMs);
-    return;
-  }
-
-  pendingGradeAggregationJobIds.push(String(jobId));
-  SchedulePendingGradeAggregationWorkers();
-}
-
-function ReleaseGradeAggregatorWorkerSlot() {
-  activeGradeAggregationWorkerCount = Math.max(activeGradeAggregationWorkerCount - 1, 0);
-  SchedulePendingGradeAggregationWorkers();
-}
-
-/**
- * Spawns the grade aggregation worker in a non-blocking flow.
- *
- * Only the stable durable job id is passed into workerData. This avoids
- * structured clone issues and lets retry/resume logic reload the same job.
- *
- * @param {string} jobId - Durable grade aggregation job identifier.
- * @returns {void}
- */
-function SpawnGradeAggregatorWorker(jobId) {
-  // *************** START: Build worker payload ***************
-  // *************** Send only serializable IDs to satisfy the worker stringification mandate
-  const payload = JSON.stringify({
-    job_id: String(jobId),
-  });
-  // *************** END: Build worker payload ***************
-
-  // *************** START: Spawn non-blocking worker ***************
-  // *************** Spawn the background worker without awaiting so the API response stays non-blocking
-  let worker;
-
-  try {
-    activeGradeAggregationWorkerCount += 1;
-    worker = new Worker(GRADE_AGGREGATOR_WORKER_PATH, {
-      workerData: payload,
-    });
-  } catch (workerBootstrapError) {
-    ReleaseGradeAggregatorWorkerSlot();
-    // *************** Log worker bootstrap failures without failing the already-committed grade mutation
-    LogGradeAggregatorWorkerError(
-      new AppError(
-        workerBootstrapError.code || 'GRADE_AGGREGATOR_WORKER_BOOTSTRAP_FAILED',
-        workerBootstrapError.httpStatus || 500,
-        workerBootstrapError.message || 'Grade aggregator worker bootstrap failed',
-        {
-          job_id: String(jobId),
-        },
-      ),
-    );
-    return;
-  }
-  // *************** END: Spawn non-blocking worker ***************
-
-  // *************** START: Register worker lifecycle listeners ***************
-  // *************** Capture worker-reported operational failures from the parent process
-  worker.on('message', (message) => {
-    if (message?.status === 'error') {
-      LogGradeAggregatorWorkerError(
-        new AppError(
-          message.code || 'GRADE_AGGREGATOR_WORKER_FAILED',
-          500,
-          message.message || 'Grade aggregator worker failed',
-          {
-            job_id: String(jobId),
-          },
-        ),
-      );
-
-      if (message.next_run_at) {
-        const delayMs = Math.max(new Date(message.next_run_at).getTime() - Date.now(), 0);
-        QueueGradeAggregatorWorker(jobId, delayMs);
-      }
-    }
-  });
-
-  // *************** Capture worker thread crashes that surface through the runtime error event
-  worker.on('error', (workerError) => {
-    LogGradeAggregatorWorkerError(
-      new AppError(
-        workerError.code || 'GRADE_AGGREGATOR_WORKER_ERROR',
-        workerError.httpStatus || 500,
-        workerError.message || 'Grade aggregator worker failed',
-        {
-          job_id: String(jobId),
-        },
-      ),
-    );
-  });
-
-  // *************** Capture abnormal worker exits after the background process terminates
-  worker.on('exit', (exitCode) => {
-    if (exitCode !== 0) {
-      LogGradeAggregatorWorkerError(
-        new AppError(
-          'GRADE_AGGREGATOR_WORKER_EXITED',
-          500,
-          `Grade aggregator worker exited with code ${exitCode}`,
-          {
-            job_id: String(jobId),
-            exit_code: exitCode,
-          },
-        ),
-      );
-    }
-
-    ReleaseGradeAggregatorWorkerSlot();
-  });
-  // *************** END: Register worker lifecycle listeners ***************
-}
-
-async function ResumePendingGradeAggregationJobs() {
-  const dueJobs = await GradeAggregationJobModel.find({
-    status: {
-      $in: ['queued', 'retry'],
-    },
-    next_run_at: {
-      $lte: new Date(),
-    },
-  })
-    .select('_id')
-    .sort({ next_run_at: 1, created_at: 1 })
-    .limit(MAX_CONCURRENT_GRADE_AGGREGATION_WORKERS)
-    .lean();
-
-  dueJobs.forEach((job) => QueueGradeAggregatorWorker(job._id));
-}
-
-async function InsertGradesAndCreateAggregationJob(mappedGrades, validatedInput, studentIds, blockId) {
-  const session = await mongoose.startSession();
-  const jobId = new mongoose.Types.ObjectId();
-  let insertedGrades = [];
-
-  try {
-    await session.withTransaction(async () => {
-      insertedGrades = await StudentGradeModel.insertMany(mappedGrades, {
-        ordered: true,
-        session,
-      });
-
-      await GradeAggregationJobModel.create(
-        [
-          {
-            _id: jobId,
-            student_ids: studentIds,
-            test_id: validatedInput.test_id,
-            academic_year_id: validatedInput.academic_year_id,
-            block_id: blockId,
-            lock_key: BuildGradeAggregationLockKey(validatedInput.academic_year_id, blockId),
-            status: 'queued',
-            next_run_at: new Date(),
-          },
-        ],
-        {
-          session,
-        },
-      );
-    });
-  } finally {
-    await session.endSession();
-  }
-
-  return {
-    insertedGrades,
-    jobId,
-  };
+  await Promise.all([AcademicStandingModel.init(), SubjectModel.init(), TestModel.init()]);
 }
 
 /**
@@ -371,16 +683,11 @@ async function SubmitTestGradesHelper(input) {
     score: grade.score,
   }));
 
-  const { insertedGrades, jobId } = await InsertGradesAndCreateAggregationJob(
-    mappedGrades,
-    validatedInput,
-    uniqueStudentIds,
-    matchingBlock._id,
-  );
+  const insertedGrades = await StudentGradeModel.insertMany(mappedGrades, { ordered: true });
   // *************** END: Transform and insert grade batch ***************
 
   // *************** START: Trigger non-blocking academic standing aggregation ***************
-  QueueGradeAggregatorWorker(jobId);
+  SpawnGradeAggregatorWorker(validatedInput, uniqueStudentIds);
   // *************** END: Trigger non-blocking academic standing aggregation ***************
 
   return insertedGrades;
@@ -388,10 +695,22 @@ async function SubmitTestGradesHelper(input) {
 
 // *************** EXPORT MODULE ***************
 module.exports = {
+  BuildAcademicStandingBulkOperation,
+  BuildScoreLookupKey,
+  CalculateAverage,
+  CompareRuleValue,
+  EvaluateStandingStatus,
   InitializeGradeAggregationIndexes,
-  InsertGradesAndCreateAggregationJob,
-  QueueGradeAggregatorWorker,
-  ResumePendingGradeAggregationJobs,
+  PENDING_STANDING_STATUS,
+  SubmitTestGradesHelper,
+  ValidateGradeSubmissionAcademicYear,
+  ValidateGradingHierarchyConfiguration,
+  ValidateGradingRulesConfiguration,
+};
+
+// *************** EXPORT MODULE ***************
+module.exports = {
+  InitializeGradeAggregationIndexes,
   SubmitTestGradesHelper,
   ValidateGradeSubmissionAcademicYear,
 };

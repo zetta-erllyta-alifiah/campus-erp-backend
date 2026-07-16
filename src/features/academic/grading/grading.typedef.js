@@ -27,6 +27,7 @@ const typeDefs = gql`
   input SubmitTestGradesInput {
     academic_year_id: ID!
     test_id: ID!
+    # Maximum 100 grade rows per mutation; split larger cohorts into controlled batches.
     grades: [StudentScoreInput!]!
   }
 
