@@ -36,6 +36,12 @@ const AcademicStandingTestSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Whether the test had an official submitted grade when the standing was computed.
+    is_graded: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
   },
   {
     _id: false,
