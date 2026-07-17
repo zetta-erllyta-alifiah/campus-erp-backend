@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 // *************** GLOBAL VARIABLES ***************
 
 // Allowed standing statuses produced by the grade aggregation worker.
-const ACADEMIC_STANDING_STATUSES = ['Pass', 'Fail', 'Retake', 'Pending'];
+const ACADEMIC_STANDING_STATUSES = ['Pass', 'Fail', 'Retake'];
 
 /**
  * Academic standing test snapshot schema.
@@ -36,12 +36,6 @@ const AcademicStandingTestSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Indicates whether this test had a submitted StudentGrade during aggregation.
-    is_graded: {
-      type: Boolean,
-      required: true,
-      default: false,
-    },
   },
   {
     _id: false,
@@ -76,13 +70,6 @@ const AcademicStandingSubjectSchema = new mongoose.Schema(
       type: String,
       enum: ACADEMIC_STANDING_STATUSES,
       required: true,
-    },
-
-    // Indicates whether all required tests under this subject have submitted grades.
-    is_complete: {
-      type: Boolean,
-      required: true,
-      default: false,
     },
 
     // Computed standings for the tests that belong to this subject.
@@ -139,13 +126,6 @@ const AcademicStandingSchema = new mongoose.Schema(
       type: String,
       enum: ACADEMIC_STANDING_STATUSES,
       required: true,
-    },
-
-    // Indicates whether all required subjects and tests under this block are complete.
-    is_complete: {
-      type: Boolean,
-      required: true,
-      default: false,
     },
 
     // Computed standings for the subjects that belong to this block.

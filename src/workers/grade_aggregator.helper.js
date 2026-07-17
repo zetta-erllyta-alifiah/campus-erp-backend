@@ -3,7 +3,7 @@
  *
  * Responsibility:
  * - Spawn the grade aggregator worker from the main thread.
- * - Validate and parse stringified worker payloads.
+ * - Validate parsed worker payloads.
  * - Load curriculum and grade data inside the worker isolate.
  * - Persist computed AcademicStanding snapshots.
  * - Report worker lifecycle failures through shared error handling.
@@ -184,24 +184,17 @@ function SpawnGradeAggregatorWorker(input, studentIds) {
 }
 
 /**
- * Validates and parses the worker payload.
+ * Validates the parsed worker payload.
  *
- * @param {string} serializedWorkerData - Stringified worker payload.
- * @returns {Object} Parsed worker payload.
+ * @param {Object} parsedWorkerData - Parsed worker payload.
+ * @returns {Object} Validated worker payload.
  * @throws {AppError} When payload is invalid.
  */
-function ParseWorkerPayload(serializedWorkerData) {
-  let payload;
+function ParseWorkerPayload(parsedWorkerData) {
   let validatedPayload;
 
   try {
-    payload = JSON.parse(serializedWorkerData);
-  } catch (_parseError) {
-    throw new AppError('INVALID_GRADE_AGGREGATOR_PAYLOAD', 400, 'Invalid grade aggregator payload');
-  }
-
-  try {
-    validatedPayload = ValidateInputWithJoi(GradeAggregatorWorkerPayloadSchema, payload);
+    validatedPayload = ValidateInputWithJoi(GradeAggregatorWorkerPayloadSchema, parsedWorkerData);
   } catch (validationError) {
     throw new AppError(
       validationError.extensions?.code || 'INVALID_GRADE_AGGREGATOR_PAYLOAD',
@@ -310,15 +303,15 @@ async function BuildScoreLookup(studentIds, tests, academicYearId) {
 /**
  * Runs the grade aggregation worker process.
  *
- * @param {string} serializedWorkerData - Stringified worker payload.
+ * @param {Object} parsedWorkerData - Parsed worker payload.
  * @returns {Promise<void>}
  */
-async function RunGradeAggregatorWorker(serializedWorkerData, messagePort = null) {
+async function RunGradeAggregatorWorker(parsedWorkerData, messagePort = null) {
   const {
     BuildAcademicStandingBulkOperation,
     ValidateGradingHierarchyConfiguration,
   } = GetGradingBusinessHelper();
-  const payload = ParseWorkerPayload(serializedWorkerData);
+  const payload = ParseWorkerPayload(parsedWorkerData);
 
   await ConnectDatabase();
 

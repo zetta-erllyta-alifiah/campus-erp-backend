@@ -18,7 +18,20 @@ const GradeAggregatorWorkerHelper = require('./grade_aggregator.helper');
 
 // *************** WORKER BOOTSTRAP ***************
 if (!isMainThread) {
-  GradeAggregatorWorkerHelper.RunGradeAggregatorWorker(workerData, parentPort)
+  (async () => {
+    let parsedWorkerData;
+
+    try {
+      parsedWorkerData = JSON.parse(workerData);
+    } catch (_parseError) {
+      const invalidPayloadError = new Error('Invalid grade aggregator payload');
+      invalidPayloadError.code = 'INVALID_GRADE_AGGREGATOR_PAYLOAD';
+      invalidPayloadError.httpStatus = 400;
+      throw invalidPayloadError;
+    }
+
+    await GradeAggregatorWorkerHelper.RunGradeAggregatorWorker(parsedWorkerData, parentPort);
+  })()
     .catch((error) => {
       GradeAggregatorWorkerHelper.HandleWorkerFailure(error, parentPort);
     })

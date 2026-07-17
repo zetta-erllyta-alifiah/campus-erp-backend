@@ -23,9 +23,6 @@ const { SubmitTestGradesSchema } = require('./grading.validator');
 
 // *************** GLOBAL VARIABLES ***************
 
-// System status used while at least one required grade is missing.
-const PENDING_STANDING_STATUS = 'Pending';
-
 // Dynamic grading rule labels supported by the AcademicStanding schema.
 const STANDING_STATUS_BY_LABEL = {
   pass: 'Pass',
@@ -440,9 +437,8 @@ function BuildScoreLookupKey(studentId, testId) {
 /**
  * Builds an AcademicStanding bulkWrite operation for one student.
  *
- * Missing grades keep their test snapshot with total_mark 0 and Pending
- * status. Any subject with at least one missing required test stays Pending,
- * and the block stays Pending until every required subject test is graded.
+ * Missing grades keep their test snapshot with total_mark 0 and are evaluated
+ * against the configured grading rules like any submitted score.
  *
  * @param {string} studentId - Student identifier.
  * @param {string} academicYearId - Academic year identifier.
@@ -476,50 +472,40 @@ function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy
     const subjectTests = testsBySubjectId.get(subject._id.toString()) || [];
     const computedTests = subjectTests.map((test) => {
       const scoreLookupKey = BuildScoreLookupKey(studentId, test._id);
-      const isGraded = scoreLookup.has(scoreLookupKey);
-      const totalMark = isGraded ? RoundMark(scoreLookup.get(scoreLookupKey)) : 0;
+      const totalMark = scoreLookup.has(scoreLookupKey) ? RoundMark(scoreLookup.get(scoreLookupKey)) : 0;
 
       return {
         test_id: test._id,
         weightage: test.weightage,
         total_mark: totalMark,
-        test_status: isGraded
-          ? EvaluateStandingStatus(totalMark, test.grading_rules, {
-              level: 'test',
-              test_id: test._id?.toString(),
-              student_id: studentId,
-            }, evaluationOptions)
-          : PENDING_STANDING_STATUS,
-        is_graded: isGraded,
+        test_status: EvaluateStandingStatus(totalMark, test.grading_rules, {
+          level: 'test',
+          test_id: test._id?.toString(),
+          student_id: studentId,
+        }, evaluationOptions),
       };
     });
 
     const subjectAverage = CalculateAverage(computedTests, 'total_mark', 'weightage');
-    const isSubjectComplete = computedTests.length > 0 && computedTests.every((test) => test.is_graded);
 
     return {
       subject_id: subject._id,
       weightage: subject.weightage,
       subject_average: subjectAverage,
-      subject_status: isSubjectComplete
-        ? EvaluateStandingStatus(subjectAverage, subject.grading_rules, {
-            level: 'subject',
-            subject_id: subject._id?.toString(),
-            student_id: studentId,
-          }, evaluationOptions)
-        : PENDING_STANDING_STATUS,
-      is_complete: isSubjectComplete,
+      subject_status: EvaluateStandingStatus(subjectAverage, subject.grading_rules, {
+        level: 'subject',
+        subject_id: subject._id?.toString(),
+        student_id: studentId,
+      }, evaluationOptions),
       tests: computedTests.map((test) => ({
         test_id: test.test_id,
         total_mark: test.total_mark,
         test_status: test.test_status,
-        is_graded: test.is_graded,
       })),
     };
   });
 
   const blockAverage = CalculateAverage(subjects, 'subject_average', 'weightage');
-  const isBlockComplete = subjects.length > 0 && subjects.every((subject) => subject.is_complete);
 
   return {
     updateOne: {
@@ -534,19 +520,15 @@ function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy
           academic_year_id: academicYearId,
           block_id: hierarchy.block._id,
           block_average: blockAverage,
-          block_status: isBlockComplete
-            ? EvaluateStandingStatus(blockAverage, hierarchy.block.grading_rules, {
-                level: 'block',
-                block_id: hierarchy.block._id?.toString(),
-                student_id: studentId,
-              }, evaluationOptions)
-            : PENDING_STANDING_STATUS,
-          is_complete: isBlockComplete,
+          block_status: EvaluateStandingStatus(blockAverage, hierarchy.block.grading_rules, {
+            level: 'block',
+            block_id: hierarchy.block._id?.toString(),
+            student_id: studentId,
+          }, evaluationOptions),
           subjects: subjects.map((subject) => ({
             subject_id: subject.subject_id,
             subject_average: subject.subject_average,
             subject_status: subject.subject_status,
-            is_complete: subject.is_complete,
             tests: subject.tests,
           })),
         },
