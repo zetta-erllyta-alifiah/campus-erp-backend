@@ -1,3 +1,14 @@
+/**
+ * Missing grade notification business logic.
+ *
+ * Responsibility:
+ * - Find active academic year grades that have not been submitted.
+ * - Group missing grade records into teacher digest emails.
+ * - Send notification emails with throttling for SMTP safety.
+ * - Persist notification logs after successful delivery for idempotency.
+ * - Log cron failures without stopping the scheduler.
+ */
+
 // *************** IMPORT MODULE ***************
 const { AcademicYearModel } = require('../../academic/enrollment/academic_year.model');
 const { AppError, LogAndNormalizeGqlError } = require('../../../core/errors');
@@ -31,6 +42,7 @@ const MISSING_GRADE_EMAIL_THROTTLE_MS = 1100;
  */
 async function LogMissingGradeCronError(error, meta = null) {
   try {
+    // *************** START: Normalize cron error for shared logging ***************
     // *************** Normalize raw cron errors into operational errors before writing to error_logs
     const errorToLog =
       error instanceof AppError || error?.isOperational
@@ -51,10 +63,13 @@ async function LogMissingGradeCronError(error, meta = null) {
       // *************** Preserve the original stack when a raw error was wrapped as AppError
       errorToLog.stack = error.stack;
     }
+    // *************** END: Normalize cron error for shared logging ***************
 
+    // *************** START: Persist cron error log ***************
     await LogAndNormalizeGqlError(errorToLog, {
       source: MISSING_GRADE_AUDITOR_SOURCE,
     });
+    // *************** END: Persist cron error log ***************
   } catch (logError) {
     // *************** Keep the cron process alive even when error logging fails
     console.error('Missing grade auditor log failed:', logError);

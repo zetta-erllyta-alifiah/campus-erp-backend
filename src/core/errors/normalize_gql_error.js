@@ -6,6 +6,42 @@ const { AppError } = require('./app_error');
 const { ErrorLogModel } = require('./error_log.model');
 
 /**
+ * Builds safe structured context for fallback error logging.
+ *
+ * @param {Error} error - Error to summarize.
+ * @returns {Object} Safe error context.
+ */
+function BuildSafeFallbackErrorContext(error) {
+  return {
+    name: error?.name || 'Error',
+    code: error?.code || 'INTERNAL_SERVER_ERROR',
+    http_status: error?.httpStatus || error?.extensions?.httpStatus || 500,
+    message: error?.message || 'Internal server error',
+  };
+}
+
+/**
+ * Writes structured fallback logs when database logging is unavailable.
+ *
+ * @param {Object} payload - Structured fallback log payload.
+ * @returns {void}
+ */
+function WriteStructuredFallbackLog(payload) {
+  try {
+    process.stderr.write(
+      `${JSON.stringify({
+        level: 'error',
+        event: 'ERROR_LOG_WRITE_FAILED',
+        timestamp: new Date().toISOString(),
+        ...payload,
+      })}\n`,
+    );
+  } catch (_fallbackLogError) {
+    // Intentionally swallow fallback logger failures to avoid recursive logging.
+  }
+}
+
+/**
  * Converts unknown errors into GraphQL errors.
  *
  * @param {Error} error
@@ -66,16 +102,22 @@ async function LogAndNormalizeGqlError(error, context = {}) {
       http_status: extensions.httpStatus || 500,
       source: context.source || 'graphql',
       stack: error.stack || null,
-      meta: extensions.meta || null,
+      meta: extensions.meta || context.meta || null,
     });
   } catch (logError) {
-    console.error(`Failed to save error log: ${logError.message}`);
+    WriteStructuredFallbackLog({
+      source: context.source || 'graphql',
+      error: BuildSafeFallbackErrorContext(error),
+      log_error: BuildSafeFallbackErrorContext(logError),
+      meta: extensions.meta || context.meta || null,
+    });
   }
 
   return gqlError;
 }
 
 module.exports = {
+  WriteStructuredFallbackLog,
   NormalizeGqlError,
   LogAndNormalizeGqlError,
 };
