@@ -683,7 +683,6 @@ module.exports = {
   CompareRuleValue,
   EvaluateStandingStatus,
   InitializeGradeAggregationIndexes,
-  PENDING_STANDING_STATUS,
   SubmitTestGradesHelper,
   ValidateGradeSubmissionAcademicYear,
   ValidateGradingHierarchyConfiguration,

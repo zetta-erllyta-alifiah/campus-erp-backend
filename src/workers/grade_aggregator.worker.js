@@ -14,6 +14,7 @@ const { isMainThread, workerData, parentPort } = require('worker_threads');
 const mongoose = require('mongoose');
 
 // *************** IMPORT MODULE ***************
+const { AppError } = require('../core/errors');
 const GradeAggregatorWorkerHelper = require('./grade_aggregator.helper');
 
 // *************** WORKER BOOTSTRAP ***************
@@ -24,10 +25,7 @@ if (!isMainThread) {
     try {
       parsedWorkerData = JSON.parse(workerData);
     } catch (_parseError) {
-      const invalidPayloadError = new Error('Invalid grade aggregator payload');
-      invalidPayloadError.code = 'INVALID_GRADE_AGGREGATOR_PAYLOAD';
-      invalidPayloadError.httpStatus = 400;
-      throw invalidPayloadError;
+      throw new AppError('INVALID_GRADE_AGGREGATOR_PAYLOAD', 400, 'Invalid grade aggregator payload');
     }
 
     await GradeAggregatorWorkerHelper.RunGradeAggregatorWorker(parsedWorkerData, parentPort);
