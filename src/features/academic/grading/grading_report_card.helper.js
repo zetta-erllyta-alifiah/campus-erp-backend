@@ -616,14 +616,44 @@ async function ReissueReportCard(input) {
  */
 async function GenerateReportCardHtml(input) {
   const validatedInput = ValidateReportCardRouteParams(input);
-  const reportCard = await findReportCardForDownload({
+
+  let reportCard = await findReportCardForDownload({
     student_id: validatedInput.studentId,
     academic_year_id: validatedInput.academicYearId,
     status: 'final',
   });
 
   if (!reportCard) {
-    throw new AppError('REPORT_CARD_NOT_FOUND', 404, 'Report card not found');
+    const validatedUser = assertAllowedReportCardRole(
+      input.user,
+      REPORT_CARD_DOWNLOAD_ROLES,
+    );
+
+    const reportCardData = await getReportCardData(
+      validatedInput.academicYearId,
+      validatedInput.studentId,
+    );
+
+    const snapshot = await buildReportCardSnapshot({
+      reportCardData,
+      user: validatedUser,
+      version: 1,
+      supersededReportCard: null,
+    });
+
+    try {
+      reportCard = await ReportCardModel.create(snapshot);
+    } catch (error) {
+      if (error?.code !== 11000) {
+        throw error;
+      }
+
+      reportCard = await findReportCardForDownload({
+        student_id: validatedInput.studentId,
+        academic_year_id: validatedInput.academicYearId,
+        status: 'final',
+      });
+    }
   }
 
   assertReportCardIntegrity(reportCard);

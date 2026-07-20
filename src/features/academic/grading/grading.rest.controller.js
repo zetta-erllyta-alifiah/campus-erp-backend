@@ -32,7 +32,10 @@ async function streamReportCardPdf(request, response, next, generateReportCardDo
 
   try {
     // *************** START: Load verified immutable report card HTML ***************
-    const reportCardDocument = await generateReportCardDocument(request.reportCardParams);
+    const reportCardDocument = await generateReportCardDocument({
+      ...request.reportCardParams,
+      user: request.user,
+    });
     // *************** END: Load verified immutable report card HTML ***************
 
     // *************** START: Stream generated PDF response ***************
