@@ -9,15 +9,19 @@ const { makeExecutableSchema } = require('@graphql-tools/schema');
 const CreateApolloServer = require('./core/apollo');
 const applicationConfig = require('./core/config');
 const { ConnectDatabase } = require('./core/db');
+const { HandleApiError } = require('./core/errors');
 const systemGraphQLModule = require('./features/system');
 const { CreateAcademicYearLoader } = require('./loaders/academic_year.loader');
 const { InitializeGradeAuditorJob } = require('./jobs/system/missing_grade_auditor.cron');
 const { InitializeGradeAggregationIndexes } = require('./features/academic/grading/grading.helper');
+const { InitializeReportCardIndexes } = require('./features/academic/grading/grading_report_card.helper');
+const { InitializePDFService } = require('./shared/services/pdf.service');
 
 const curriculumModule = require('./features/academic/curriculum');
 const studentModule = require('./features/users/student');
 const enrollmentModule = require('./features/academic/enrollment');
 const gradingModule = require('./features/academic/grading');
+const gradingRestRouter = require('./features/academic/grading/grading.rest.router');
 const authModule = require('./features/users/auth');
 const AuthMiddleware = require('./shared/middlewares/auth.middleware');
 const { AuthDirectiveTransformer } = require('./shared/directives/auth.directive');
@@ -73,14 +77,23 @@ async function InitializeApplication() {
     // *************** Initialize grading indexes once during application startup ***************
     await InitializeGradeAggregationIndexes();
 
+    // *************** Initialize immutable report card indexes before REST downloads are available ***************
+    await InitializeReportCardIndexes();
+
     // *************** Initialize background jobs after database is ready ***************
     await InitializeGradeAuditorJob();
+
+    // *************** Initialize the singleton PDF browser once during application boot ***************
+    await InitializePDFService();
 
     // *************** Configure Express application ***************
     const expressApplication = express();
     expressApplication.use(cors());
     expressApplication.use(express.json());
     expressApplication.use(AuthMiddleware);
+
+    // *************** Register binary REST endpoint before Apollo middleware ***************
+    expressApplication.use('/api/academics', gradingRestRouter);
 
     // *************** Configure Apollo Server ***************
     const executableSchema = makeExecutableSchema({
@@ -102,6 +115,9 @@ async function InitializeApplication() {
         }),
       }),
     );
+
+    // *************** Register centralized REST error logging and response formatting ***************
+    expressApplication.use(HandleApiError);
 
     // *************** Start HTTP server ***************
     expressApplication.listen(applicationConfig.port, () => {

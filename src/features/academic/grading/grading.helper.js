@@ -483,6 +483,7 @@ function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy
           test_id: test._id?.toString(),
           student_id: studentId,
         }, evaluationOptions),
+        is_graded: scoreLookup.has(scoreLookupKey),
       };
     });
 
@@ -501,6 +502,7 @@ function BuildAcademicStandingBulkOperation(studentId, academicYearId, hierarchy
         test_id: test.test_id,
         total_mark: test.total_mark,
         test_status: test.test_status,
+        is_graded: test.is_graded,
       })),
     };
   });
