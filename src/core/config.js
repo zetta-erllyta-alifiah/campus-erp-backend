@@ -100,9 +100,13 @@ function validateEnvironmentVariables() {
   }
 
   try {
-    new URL(process.env.WEBHOOK_WAREHOUSE_URL);
+    const webhookWarehouseUrl = new URL(process.env.WEBHOOK_WAREHOUSE_URL);
+
+    if (!['http:', 'https:'].includes(webhookWarehouseUrl.protocol)) {
+      throw new Error('Unsupported webhook URL protocol.');
+    }
   } catch (_error) {
-    throw new GraphQLError('WEBHOOK_WAREHOUSE_URL must be a valid URL.', {
+    throw new GraphQLError('WEBHOOK_WAREHOUSE_URL must be a valid HTTP or HTTPS URL.', {
       extensions: {
         code: 'CONFIG_WEBHOOK_WAREHOUSE_URL_INVALID',
         httpStatus: 500,
