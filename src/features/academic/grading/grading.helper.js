@@ -563,7 +563,12 @@ function ValidateGradeSubmissionAcademicYear(existingSubject, existingAcademicYe
  * @returns {Promise<void>}
  */
 async function InitializeGradeAggregationIndexes() {
-  await Promise.all([AcademicStandingModel.init(), SubjectModel.init(), TestModel.init()]);
+  await Promise.all([
+    AcademicStandingModel.init(),
+    StudentGradeModel.init(),
+    SubjectModel.init(),
+    TestModel.init(),
+  ]);
 }
 
 /**
@@ -630,15 +635,6 @@ async function SubmitTestGradesHelper(input) {
   }).select('_id').lean();
   const validStudentIdSet = new Set(validStudents.map((student) => String(student._id)));
 
-  const existingGrades = await StudentGradeModel.find({
-    academic_year_id: validatedInput.academic_year_id,
-    test_id: validatedInput.test_id,
-    student_id: {
-      $in: uniqueStudentIds,
-    },
-  }).select('student_id').lean();
-
-  const existingGradeStudentIdSet = new Set(existingGrades.map((grade) => String(grade.student_id)));
   // *************** END: Prepare student reference validation ***************
 
   // *************** START: Pre-validate every grade before bulk insert ***************
@@ -651,10 +647,6 @@ async function SubmitTestGradesHelper(input) {
 
     if (!enrolledStudentIdSet.has(studentId)) {
       throw new AppError('STUDENT_NOT_ENROLLED_IN_ACADEMIC_YEAR', 400, 'Student is not enrolled in academic year');
-    }
-
-    if (existingGradeStudentIdSet.has(studentId)) {
-      throw new AppError('DUPLICATE_STUDENT_GRADE', 409, 'Student grade already exists');
     }
   }
   // *************** END: Pre-validate every grade before bulk insert ***************

@@ -8,13 +8,13 @@
  */
 
 // *************** IMPORT MODULE ***************
-const config = require('../../core/config');
-const { AppError } = require('../../core/errors');
+const config = require("../../core/config");
+const { AppError } = require("../../core/errors");
 
 // *************** GLOBAL VARIABLES ***************
 
 // *************** Stable event name consumed by the external analytics warehouse
-const ACADEMIC_STANDINGS_UPDATED = 'ACADEMIC_STANDINGS_UPDATED';
+const ACADEMIC_STANDINGS_UPDATED = "ACADEMIC_STANDINGS_UPDATED";
 
 // *************** SERVICE ***************
 
@@ -31,9 +31,14 @@ async function DispatchAcademicStandings(standingsArray) {
   try {
     // *************** START: Validate webhook payload ***************
     if (!Array.isArray(standingsArray)) {
-      throw new AppError('INVALID_WEBHOOK_PAYLOAD', 500, 'Academic standings webhook payload must be an array', {
-        received_type: typeof standingsArray,
-      });
+      throw new AppError(
+        "INVALID_WEBHOOK_PAYLOAD",
+        500,
+        "Academic standings webhook payload must be an array",
+        {
+          received_type: typeof standingsArray,
+        },
+      );
     }
     // *************** END: Validate webhook payload ***************
 
@@ -52,13 +57,13 @@ async function DispatchAcademicStandings(standingsArray) {
 
     // *************** START: Dispatch webhook request ***************
     const response = await fetch(config.webhook.warehouseUrl, {
-      method: 'POST',
+      method: "POST",
       headers: {
         // *************** Declare the outbound payload format
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
 
         // *************** Authenticate this ERP service to the external warehouse consumer
-        'x-api-key': config.webhook.warehouseSecret,
+        "x-api-key": config.webhook.warehouseSecret,
       },
       body: JSON.stringify(payload),
     });
@@ -66,11 +71,16 @@ async function DispatchAcademicStandings(standingsArray) {
 
     // *************** START: Validate webhook response ***************
     if (!response.ok) {
-      throw new AppError('WEBHOOK_DISPATCH_FAILED', 502, 'External analytics webhook rejected the request', {
-        event: ACADEMIC_STANDINGS_UPDATED,
-        response_status: response.status,
-        record_count: standingsArray.length,
-      });
+      throw new AppError(
+        "WEBHOOK_DISPATCH_FAILED",
+        502,
+        "External analytics webhook rejected the request",
+        {
+          event: ACADEMIC_STANDINGS_UPDATED,
+          response_status: response.status,
+          record_count: standingsArray.length,
+        },
+      );
     }
     // *************** END: Validate webhook response ***************
   } catch (error) {

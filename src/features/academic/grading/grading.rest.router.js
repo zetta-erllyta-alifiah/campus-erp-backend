@@ -2,8 +2,9 @@
  * Academic grading REST router.
  *
  * Responsibility:
- * - Define REST routes for academic grading resources.
- * - Keep route definitions free from business, template, and streaming logic.
+ * - Define REST routes for academic grading report card downloads.
+ * - Keep route definitions free from business, template, PDF, and streaming logic.
+ * - Apply authentication, validation, authorization, and rate limiting before controllers run.
  */
 
 // *************** IMPORT LIBRARY ***************
@@ -14,22 +15,19 @@ const { CreateRateLimitMiddleware } = require('../../../shared/middlewares/rate_
 const { RequireAuthenticatedRestRequest } = require('../../../shared/middlewares/rest_auth.middleware');
 const {
   AuthorizeReportCardAccessMiddleware,
-  AuthorizeReportCardIssuanceMiddleware,
   ValidateReportCardParamsMiddleware,
 } = require('./grading.rest.middleware');
 const {
-  IssueReportCardController,
-  ReissueReportCardController,
   StreamReportCardController,
   StreamReportCardVersionController,
 } = require('./grading.rest.controller');
 
 // *************** GLOBAL VARIABLES ***************
 
-// Dedicated router mounted outside the GraphQL endpoint.
+// *************** Dedicated REST router mounted outside the GraphQL endpoint
 const gradingRestRouter = express.Router();
 
-// Report card PDF downloads are limited to 10 requests per 10 minutes.
+// *************** Limit PDF downloads because rendering is CPU and memory sensitive
 const reportCardDownloadRateLimit = CreateRateLimitMiddleware({
   windowMs: 10 * 60 * 1000,
   maxRequests: 10,
@@ -45,7 +43,18 @@ const reportCardDownloadRateLimit = CreateRateLimitMiddleware({
 // *************** REST ROUTE ***************
 
 /**
- * Downloads an official immutable report card PDF.
+ * Downloads the current official immutable report card PDF.
+ *
+ * Flow:
+ * - Authenticate the REST request.
+ * - Validate academicYearId and studentId.
+ * - Authorize report card access.
+ * - Load the existing final report card snapshot.
+ * - If no final snapshot exists yet, create the first immutable snapshot from Student and AcademicStanding.
+ * - Render the snapshot HTML as a PDF stream.
+ *
+ * Method: GET
+ * Path: /report-card/:academicYearId/:studentId
  */
 gradingRestRouter.get(
   '/report-card/:academicYearId/:studentId',
@@ -58,6 +67,12 @@ gradingRestRouter.get(
 
 /**
  * Downloads one immutable historical report card PDF version.
+ *
+ * This route supports audit/history access. It only reads an existing immutable snapshot
+ * and never creates a new report card version.
+ *
+ * Method: GET
+ * Path: /report-card/:academicYearId/:studentId/versions/:version
  */
 gradingRestRouter.get(
   '/report-card/:academicYearId/:studentId/versions/:version',
@@ -68,27 +83,5 @@ gradingRestRouter.get(
   StreamReportCardVersionController,
 );
 
-/**
- * Issues the first official immutable report card version.
- */
-gradingRestRouter.post(
-  '/report-card/:academicYearId/:studentId/issue',
-  RequireAuthenticatedRestRequest,
-  ValidateReportCardParamsMiddleware,
-  AuthorizeReportCardIssuanceMiddleware,
-  IssueReportCardController,
-);
-
-/**
- * Issues a corrected version without overwriting report card history.
- */
-gradingRestRouter.post(
-  '/report-card/:academicYearId/:studentId/reissue',
-  RequireAuthenticatedRestRequest,
-  ValidateReportCardParamsMiddleware,
-  AuthorizeReportCardIssuanceMiddleware,
-  ReissueReportCardController,
-);
-
-// *************** EXPORT MODULE ***************
+// *************** EXPORT ROUTER MODULE ***************
 module.exports = gradingRestRouter;

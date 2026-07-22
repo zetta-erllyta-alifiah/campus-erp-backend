@@ -15,9 +15,10 @@ const { GraphQLError } = require('graphql');
  * @throws {GraphQLError} CONFIG_SMTP_USER_REQUIRED
  * @throws {GraphQLError} CONFIG_SMTP_PASS_REQUIRED
  * @throws {GraphQLError} CONFIG_WEBHOOK_WAREHOUSE_URL_REQUIRED
+ * @throws {GraphQLError} CONFIG_WEBHOOK_WAREHOUSE_URL_INVALID
  * @throws {GraphQLError} CONFIG_WEBHOOK_WAREHOUSE_SECRET_REQUIRED
  */
-function ValidateEnvironmentVariables() {
+function validateEnvironmentVariables() {
   if (!process.env.MONGO_URI) {
     throw new GraphQLError('MONGO_URI is not defined.', {
       extensions: {
@@ -98,6 +99,18 @@ function ValidateEnvironmentVariables() {
     });
   }
 
+  try {
+    new URL(process.env.WEBHOOK_WAREHOUSE_URL);
+  } catch (_error) {
+    throw new GraphQLError('WEBHOOK_WAREHOUSE_URL must be a valid URL.', {
+      extensions: {
+        code: 'CONFIG_WEBHOOK_WAREHOUSE_URL_INVALID',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
+  }
+
   if (!process.env.WEBHOOK_WAREHOUSE_SECRET) {
     throw new GraphQLError('WEBHOOK_WAREHOUSE_SECRET is not defined.', {
       extensions: {
@@ -110,7 +123,7 @@ function ValidateEnvironmentVariables() {
 }
 
 // *************** GLOBAL VARIABLES ***************
-ValidateEnvironmentVariables();
+validateEnvironmentVariables();
 
 const applicationConfig = {
   port: process.env.PORT,

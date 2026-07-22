@@ -609,6 +609,16 @@ async function ReissueReportCard(input) {
 }
 
 /**
+ * Detects duplicate-key errors from MongoDB/Mongoose writes.
+ *
+ * @param {Error} error - Persistence error.
+ * @returns {boolean} True when the write failed because a unique index already exists.
+ */
+function isDuplicateKeyError(error) {
+  return error?.code === 11000;
+}
+
+/**
  * Loads the current final immutable report card HTML for PDF download.
  *
  * @param {Object} input - Validated route identifiers.
@@ -644,7 +654,7 @@ async function GenerateReportCardHtml(input) {
     try {
       reportCard = await ReportCardModel.create(snapshot);
     } catch (error) {
-      if (error?.code !== 11000) {
+      if (!isDuplicateKeyError(error)) {
         throw error;
       }
 
@@ -653,6 +663,10 @@ async function GenerateReportCardHtml(input) {
         academic_year_id: validatedInput.academicYearId,
         status: 'final',
       });
+
+      if (!reportCard) {
+        throw new AppError('REPORT_CARD_VERSION_CONFLICT', 409, 'Report card version conflict');
+      }
     }
   }
 
