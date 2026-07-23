@@ -22,6 +22,7 @@ const { AppError, LogAndNormalizeGqlError, WriteStructuredFallbackLog } = requir
 const { BlockModel, SubjectModel, TestModel } = require('../features/academic/curriculum/curriculum.model');
 const { StudentGradeModel } = require('../features/academic/grading/student_grade.model');
 const { AcademicStandingModel } = require('../features/academic/grading/academic_standing.model');
+const { DispatchAcademicStandings } = require('../shared/services/webhook.service');
 
 // *************** IMPORT VALIDATOR ***************
 const { ObjectIdValidator, ValidateInputWithJoi } = require('../shared/validators/validator');
@@ -324,11 +325,14 @@ async function RunGradeAggregatorWorker(parsedWorkerData, messagePort = null) {
       skipHierarchyValidation: true,
     });
   });
+  const calculatedStandings = bulkOperations.map((operation) => operation.updateOne.update.$set);
 
   if (bulkOperations.length > 0) {
     await AcademicStandingModel.bulkWrite(bulkOperations, {
       ordered: false,
     });
+
+    await DispatchAcademicStandings(calculatedStandings);
   }
 
   if (messagePort) {

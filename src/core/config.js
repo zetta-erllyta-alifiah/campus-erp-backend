@@ -5,8 +5,18 @@ const { GraphQLError } = require('graphql');
 // *************** IMPORT HELPER FUNCTION ***************
 /**
  * Validates required environment variables.
+ *
+ * @returns {void}
  * @throws {GraphQLError} CONFIG_MONGO_URI_REQUIRED
  * @throws {GraphQLError} CONFIG_PORT_REQUIRED
+ * @throws {GraphQLError} CONFIG_JWT_SECRET_REQUIRED
+ * @throws {GraphQLError} CONFIG_SMTP_HOST_REQUIRED
+ * @throws {GraphQLError} CONFIG_SMTP_PORT_REQUIRED
+ * @throws {GraphQLError} CONFIG_SMTP_USER_REQUIRED
+ * @throws {GraphQLError} CONFIG_SMTP_PASS_REQUIRED
+ * @throws {GraphQLError} CONFIG_WEBHOOK_WAREHOUSE_URL_REQUIRED
+ * @throws {GraphQLError} CONFIG_WEBHOOK_WAREHOUSE_URL_INVALID
+ * @throws {GraphQLError} CONFIG_WEBHOOK_WAREHOUSE_SECRET_REQUIRED
  */
 function validateEnvironmentVariables() {
   if (!process.env.MONGO_URI) {
@@ -78,6 +88,42 @@ function validateEnvironmentVariables() {
       },
     });
   }
+
+  if (!process.env.WEBHOOK_WAREHOUSE_URL) {
+    throw new GraphQLError('WEBHOOK_WAREHOUSE_URL is not defined.', {
+      extensions: {
+        code: 'CONFIG_WEBHOOK_WAREHOUSE_URL_REQUIRED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
+  }
+
+  try {
+    const webhookWarehouseUrl = new URL(process.env.WEBHOOK_WAREHOUSE_URL);
+
+    if (!['http:', 'https:'].includes(webhookWarehouseUrl.protocol)) {
+      throw new Error('Unsupported webhook URL protocol.');
+    }
+  } catch (_error) {
+    throw new GraphQLError('WEBHOOK_WAREHOUSE_URL must be a valid HTTP or HTTPS URL.', {
+      extensions: {
+        code: 'CONFIG_WEBHOOK_WAREHOUSE_URL_INVALID',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
+  }
+
+  if (!process.env.WEBHOOK_WAREHOUSE_SECRET) {
+    throw new GraphQLError('WEBHOOK_WAREHOUSE_SECRET is not defined.', {
+      extensions: {
+        code: 'CONFIG_WEBHOOK_WAREHOUSE_SECRET_REQUIRED',
+        httpStatus: 500,
+        meta: null,
+      },
+    });
+  }
 }
 
 // *************** GLOBAL VARIABLES ***************
@@ -94,6 +140,10 @@ const applicationConfig = {
     port: Number(process.env.SMTP_PORT),
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
+  },
+  webhook: {
+    warehouseUrl: process.env.WEBHOOK_WAREHOUSE_URL,
+    warehouseSecret: process.env.WEBHOOK_WAREHOUSE_SECRET,
   },
 };
 
