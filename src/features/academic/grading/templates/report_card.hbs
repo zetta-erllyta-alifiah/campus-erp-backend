@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Official Report Card</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 18mm 14mm;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: #172033;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      header {
+        border-bottom: 3px solid #234e70;
+        margin-bottom: 18px;
+        padding-bottom: 12px;
+        text-align: center;
+      }
+
+      h1 {
+        color: #17324d;
+        font-size: 24px;
+        letter-spacing: 1.5px;
+        margin: 0 0 4px;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        color: #17324d;
+        font-size: 15px;
+        margin: 0 0 8px;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .subtitle {
+        color: #526579;
+        font-size: 12px;
+      }
+
+      .student-summary {
+        background: #f3f6f8;
+        border: 1px solid #d5dee6;
+        border-radius: 4px;
+        display: grid;
+        gap: 8px 18px;
+        grid-template-columns: 1fr 1fr;
+        margin-bottom: 20px;
+        padding: 12px 14px;
+      }
+
+      .label {
+        color: #526579;
+        display: block;
+        font-size: 9px;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+
+      .value {
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .standing-block {
+        break-inside: avoid;
+        margin-bottom: 20px;
+      }
+
+      .block-heading {
+        align-items: center;
+        background: #234e70;
+        color: #fff;
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 10px;
+      }
+
+      .block-heading h2 {
+        color: #fff;
+        margin: 0;
+      }
+
+      table {
+        border-collapse: collapse;
+        table-layout: fixed;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border: 1px solid #ccd6df;
+        padding: 7px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #e9eff4;
+        color: #29445c;
+        font-size: 9px;
+        letter-spacing: 0.35px;
+        text-transform: uppercase;
+      }
+
+      .numeric,
+      .status {
+        text-align: center;
+        width: 15%;
+      }
+
+      .subject-row td {
+        background: #f7f9fb;
+        font-weight: bold;
+      }
+
+      .test-name {
+        padding-left: 22px;
+      }
+
+      footer {
+        border-top: 1px solid #ccd6df;
+        color: #607286;
+        font-size: 9px;
+        margin-top: 26px;
+        padding-top: 8px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Official Report Card</h1>
+      <p class="subtitle">Academic Year {{academic_year.name}}</p>
+    </header>
+
+    <main>
+      <section class="student-summary" aria-label="Student information">
+        <div>
+          <span class="label">Student</span>
+          <span class="value">{{student.first_name}} {{student.last_name}}</span>
+        </div>
+        <div>
+          <span class="label">Student Number</span>
+          <span class="value">{{student.student_number}}</span>
+        </div>
+        <div>
+          <span class="label">Email</span>
+          <span class="value">{{student.email}}</span>
+        </div>
+        <div>
+          <span class="label">Academic Period</span>
+          <span class="value">{{academic_year.start_date}} - {{academic_year.end_date}}</span>
+        </div>
+        <div>
+          <span class="label">Status</span>
+          <span class="value">{{report_card.status}}</span>
+        </div>
+        <div>
+          <span class="label">Version</span>
+          <span class="value">{{report_card.version}}</span>
+        </div>
+        <div>
+          <span class="label">Finalized At</span>
+          <span class="value">{{report_card.finalized_at}}</span>
+        </div>
+      </section>
+
+      {{#each standings}}
+        <section class="standing-block" aria-label="Block academic standing">
+          <div class="block-heading">
+            <h2>{{block_name}}</h2>
+            <span>Average: {{block_average}} &nbsp;|&nbsp; Status: {{block_status}}</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Subject / Test</th>
+                <th class="numeric">Grade</th>
+                <th class="status">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each subjects}}
+                <tr class="subject-row">
+                  <td>{{subject_name}}</td>
+                  <td class="numeric">{{subject_average}}</td>
+                  <td class="status">{{subject_status}}</td>
+                </tr>
+                {{#each tests}}
+                  <tr>
+                    <td class="test-name">{{test_name}}</td>
+                    <td class="numeric">{{total_mark}}</td>
+                    <td class="status">{{test_status}}</td>
+                  </tr>
+                {{/each}}
+              {{/each}}
+            </tbody>
+          </table>
+        </section>
+      {{/each}}
+    </main>
+
+    <footer>
+      Issued on {{issued_at}}. This document reflects the final immutable report card snapshot stored by the system.
+    </footer>
+  </body>
+</html>
